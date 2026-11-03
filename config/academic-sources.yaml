@@ -1,0 +1,28 @@
+version: "1.0"
+
+# Sources interrogées quand --sources n'est pas précisé.
+default_sources: [arxiv, openalex]
+default_max_results: 50  # par source
+
+retry:
+  max_attempts: 3
+  backoff_seconds: 2  # doublé à chaque tentative
+
+providers:
+  arxiv:
+    enabled: true
+    base_url: https://export.arxiv.org/api/query
+    page_size: 100
+    timeout_seconds: 30
+    # arXiv demande au moins 3 secondes entre deux requêtes.
+    min_interval_seconds: 3
+
+  openalex:
+    enabled: true
+    base_url: https://api.openalex.org
+    page_size: 100
+    timeout_seconds: 30
+    min_interval_seconds: 0.2
+    # Authentification : variables OPENALEX_API_KEY et OPENALEX_MAILTO (voir .env.example).
+
+# Semantic Scholar et Crossref : connecteurs prévus dans un sprint ultérieur.

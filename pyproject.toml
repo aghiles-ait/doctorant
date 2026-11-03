@@ -1,0 +1,29 @@
+[project]
+name = "research-lab"
+version = "0.1.0"
+description = "AI Research Doctorant — outils déterministes du laboratoire de recherche assisté par IA"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.9",
+    "httpx>=0.27",
+    "typer>=0.12",
+    "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "respx>=0.21"]
+
+[project.scripts]
+research-lab = "research_lab.cli:app"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["network: appelle les vraies APIs académiques (exclu par défaut)"]
+addopts = "-m 'not network'"

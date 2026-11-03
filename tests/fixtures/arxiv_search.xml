@@ -1,0 +1,54 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/+B5yu6/wXDCUr193Ch56fB+0+L4</id>
+  <title>arXiv Query: search_query=all:decentralized AND all:governance AND submittedDate:"202401010000 TO 202512312359"&amp;id_list=&amp;start=0&amp;max_results=2</title>
+  <updated>2026-10-26T13:58:19Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=all:decentralized+AND+(all:governance+AND+submittedDate:%22202401010000+TO+202512312359%22)&amp;start=0&amp;max_results=2&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>2</opensearch:itemsPerPage>
+  <opensearch:totalResults>199</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2504.15676v1</id>
+    <title>Trustworthy Decentralized Autonomous Machines: A New Paradigm in Automation Economy</title>
+    <updated>2025-04-22T07:59:46Z</updated>
+    <link href="https://arxiv.org/abs/2504.15676v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2504.15676v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Decentralized Autonomous Machines (DAMs) represent a transformative paradigm in automation economy, integrating artificial intelligence (AI), blockchain technology, and Internet of Things (IoT) devices to create self-governing economic agents participating in Decentralized Physical Infrastructure Networks (DePIN). Capable of managing both digital and physical assets and unlike traditional Decentralized Autonomous Organizations (DAOs), DAMs extend autonomy into the physical world, enabling trustless systems for Real and Digital World Assets (RDWAs). In this paper, we explore the technological foundations, and challenges of DAMs and argue that DAMs are pivotal in transitioning from trust-based to trustless economic models, offering scalable, transparent, and equitable solutions for asset management. The integration of AI-driven decision-making, IoT-enabled operational autonomy, and blockchain-based governance allows DAMs to decentralize ownership, optimize resource allocation, and democratize access to economic opportunities. Therefore, in this research, we highlight the potential of DAMs to address inefficiencies in centralized systems, reduce wealth disparities, and foster a post-labor economy.</summary>
+    <category term="cs.MA" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-04-22T07:59:46Z</published>
+    <arxiv:comment>To be published in IEEE International Workshop on Decentralized Physical Infrastructure Networks 2025, in conjunction with ICBC'25. 7 pages. 3 figures</arxiv:comment>
+    <arxiv:primary_category term="cs.MA"/>
+    <author>
+      <name>Fernando Castillo</name>
+    </author>
+    <author>
+      <name>Oscar Castillo</name>
+    </author>
+    <author>
+      <name>Eduardo Brito</name>
+    </author>
+    <author>
+      <name>Simon Espinola</name>
+    </author>
+    <arxiv:doi>10.1109/ICBC64466.2025.11185065</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1109/ICBC64466.2025.11185065" title="doi"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2505.04136v1</id>
+    <title>Delegation and Participation in Decentralized Governance: An Epistemic View</title>
+    <updated>2025-05-07T05:20:30Z</updated>
+    <link href="https://arxiv.org/abs/2505.04136v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2505.04136v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We develop and apply epistemic tests to various decentralized governance methods as well as to study the impact of participation. These tests probe the ability to reach a correct outcome when there is one. We find that partial abstention is a strong governance method from an epistemic standpoint compared to alternatives such as various forms of ``transfer delegation" in which voters explicitly transfer some or all of their voting rights to others. We make a stronger case for multi-step transfer delegation than is present in previous work but also demonstrate that transfer delegation has inherent epistemic weaknesses. We show that enhanced direct participation, voters exercising their own voting rights, can have a variety of epistemic impacts, some very negative. We identify governance conditions under which additional direct participation is guaranteed to do no epistemic harm and is likely to increase the probability of making correct decisions. In light of the epistemic challenges of voting-based decentralized governance, we consider the possible supplementary use of prediction markets, auctions, and AI agents to improve outcomes. All these results are significant because epistemic performance matters if entities such as DAOs (decentralized autonomous organizations) wish to compete with organizations that are more centralized.</summary>
+    <category term="cs.SI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.GT" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="econ.TH" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-05-07T05:20:30Z</published>
+    <arxiv:comment>76 pages including title page and table of contents</arxiv:comment>
+    <arxiv:primary_category term="cs.SI"/>
+    <author>
+      <name>Jeff Strnad</name>
+    </author>
+  </entry>
+</feed>

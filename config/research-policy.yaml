@@ -1,0 +1,22 @@
+version: "1.0"
+
+# Règles appliquées par le code (research-lab corpus check / watch search).
+literature_search:
+  # En dessous de ce seuil, `corpus check` renvoie NEEDS_MORE_RESEARCH.
+  min_corpus_size: 20
+  # Autorise l'option --allow-partial (fusion des résultats quand une source échoue).
+  allow_partial_search: false
+
+# Règles que l'agent doit respecter (spec §8). Contrôles automatisés à partir du sprint 2.
+scientific_quality:
+  never_fabricate_references: true
+  require_claim_traceability: true       # Q2
+  require_contradictory_search: true     # Q3
+  require_falsifiable_hypotheses: true   # Q4
+  report_search_limitations: true        # Q5
+  never_infer_novelty_from_small_corpus: true
+
+# Validations humaines (spec §1.3). Implémentées aux sprints 2 et 3.
+human_gates:
+  gate_1: required
+  gate_2: required

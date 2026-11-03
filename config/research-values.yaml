@@ -1,0 +1,44 @@
+version: "1.0"
+
+values:
+  privacy:
+    description: >
+      Minimize unauthorized disclosure of sensitive data,
+      model inputs, outputs and intermediate computations.
+    weight: 1.0
+
+  freedom:
+    description: >
+      Preserve user autonomy, portability and freedom
+      to choose or replace AI systems.
+    weight: 1.0
+
+  sovereignty:
+    description: >
+      Preserve meaningful control over data,
+      infrastructure and AI execution.
+    weight: 1.0
+
+  governance:
+    description: >
+      Support transparent, accountable and
+      contestable governance mechanisms.
+    weight: 1.0
+
+  decentralization:
+    description: >
+      Reduce unnecessary trusted intermediaries
+      and single points of control.
+    weight: 1.0
+
+  verifiability:
+    description: >
+      Enable independent verification of
+      important system properties.
+    weight: 1.0
+
+evaluation:
+  scale: [0, 1, 2, 3, 4, 5]
+  require_justification: true
+  report_tradeoffs: true
+  allow_not_applicable: true

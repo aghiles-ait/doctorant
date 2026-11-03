@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/research-lab *)",
+      "Bash(.venv/bin/pytest *)",
+      "Bash(.venv/bin/pytest)"
+    ],
+    "deny": [
+      "Edit(research/projects/**/papers.json)",
+      "Edit(research/projects/**/search-log.json)",
+      "Edit(research/projects/**/project.yaml)"
+    ]
+  }
+}

@@ -1,0 +1,515 @@
+{
+ "meta": {
+  "notice": "No API key, so this request shares one free daily budget ($0.10) with everyone on your network's IP address. Get a free key with its own $1/day at https://openalex.org/settings/api and add api_key=YOUR_KEY to your requests. An AI agent can get one for its user in one call: POST https://api.openalex.org/api-keys with {\"email\": \"<your user's email>\"}; we email them a link, and the key works once they click it. Docs for agents: https://help.openalex.org/llms.txt",
+  "count": 871,
+  "db_response_time_ms": 43,
+  "page": 1,
+  "per_page": 3,
+  "groups_count": null,
+  "x_query": {
+   "oql": "get works since 2025-01-01 with (decentralized autonomous machines) in the title or abstract",
+   "x_new_oql": "get works since 2025-01-01 with (decentralized autonomous machines) in the title or abstract",
+   "oqo": {
+    "get_rows": "works",
+    "filter_rows": [
+     {
+      "column_id": "from_publication_date",
+      "value": "2025-01-01"
+     },
+     {
+      "column_id": "title_and_abstract.search",
+      "value": "decentralized autonomous machines",
+      "operator": "has"
+     }
+    ]
+   },
+   "url": "/works?filter=from_publication_date:2025-01-01,title_and_abstract.search:decentralized autonomous machines&per_page=3",
+   "order": "best matches first",
+   "order_default": true
+  },
+  "cost_usd": 0.001
+ },
+ "results": [
+  {
+   "id": "https://openalex.org/W7128368514",
+   "doi": "https://doi.org/10.21227/hyqx-bn32",
+   "display_name": "\"Agentic Decentralized Autonomous Machines Dataset\"",
+   "publication_date": "2026-02-09",
+   "authorships": [
+    {
+     "author_position": "first",
+     "author": {
+      "id": "https://openalex.org/A5140540873",
+      "display_name": "Chiebonam Benjamin Nweke",
+      "orcid": null,
+      "observed_orcids": []
+     },
+     "institutions": [],
+     "countries": [],
+     "is_corresponding": true,
+     "raw_author_name": "Chiebonam Nweke",
+     "raw_affiliation_strings": [],
+     "raw_orcid": null,
+     "affiliations": []
+    }
+   ],
+   "primary_location": {
+    "id": "doi:10.21227/hyqx-bn32",
+    "doi": "https://doi.org/10.21227/hyqx-bn32",
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.21227/hyqx-bn32",
+    "pdf_url": null,
+    "source": {
+     "id": "https://openalex.org/S7407051695",
+     "display_name": "IEEE DataPort",
+     "issn_l": null,
+     "issn": null,
+     "is_oa": false,
+     "is_in_doaj": false,
+     "is_core": false,
+     "listed_in": [],
+     "host_organization": null,
+     "host_organization_name": null,
+     "host_organization_lineage": [],
+     "host_organization_lineage_names": [],
+     "type": "repository"
+    },
+    "license": "cc-by",
+    "license_id": "https://openalex.org/licenses/cc-by",
+    "version": null,
+    "is_accepted": false,
+    "is_published": false,
+    "raw_source_name": null,
+    "raw_type": "Dataset"
+   },
+   "locations": [
+    {
+     "id": "doi:10.21227/hyqx-bn32",
+     "doi": "https://doi.org/10.21227/hyqx-bn32",
+     "is_oa": true,
+     "landing_page_url": "https://doi.org/10.21227/hyqx-bn32",
+     "pdf_url": null,
+     "source": {
+      "id": "https://openalex.org/S7407051695",
+      "display_name": "IEEE DataPort",
+      "issn_l": null,
+      "issn": null,
+      "is_oa": false,
+      "is_in_doaj": false,
+      "is_core": false,
+      "listed_in": [],
+      "host_organization": null,
+      "host_organization_name": null,
+      "host_organization_lineage": [],
+      "host_organization_lineage_names": [],
+      "type": "repository"
+     },
+     "license": "cc-by",
+     "license_id": "https://openalex.org/licenses/cc-by",
+     "version": null,
+     "is_accepted": false,
+     "is_published": null,
+     "raw_source_name": null,
+     "raw_type": "Dataset"
+    }
+   ],
+   "ids": {
+    "openalex": "https://openalex.org/W7128368514",
+    "doi": "https://doi.org/10.21227/hyqx-bn32"
+   },
+   "type": "dataset"
+  },
+  {
+   "id": "https://openalex.org/W4414632071",
+   "doi": "https://doi.org/10.1109/icbc64466.2025.11185065",
+   "display_name": "Trustworthy Decentralized Autonomous Machines: A New Paradigm in Automation Economy",
+   "publication_date": "2025-06-02",
+   "authorships": [
+    {
+     "author_position": "first",
+     "author": {
+      "id": "https://openalex.org/A5099703853",
+      "display_name": "Fernando Castillo",
+      "orcid": "https://orcid.org/0009-0003-6835-8711",
+      "observed_orcids": [
+       "https://orcid.org/0009-0003-6835-8711"
+      ]
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I4577782",
+       "display_name": "Technische Universität Berlin",
+       "ror": "https://ror.org/03v4gjf40",
+       "country_code": "DE",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I4577782"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Fernando Castillo",
+     "raw_affiliation_strings": [
+      "Technische Universit&#x00E4;t Berlin,Berlin,Germany"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "Technische Universit&#x00E4;t Berlin,Berlin,Germany",
+       "institution_ids": [
+        "https://openalex.org/I4577782"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5048223855",
+      "display_name": "Oscar Castillo",
+      "orcid": "https://orcid.org/0000-0002-7385-5689",
+      "observed_orcids": [
+       "https://orcid.org/0000-0002-7385-5689"
+      ]
+     },
+     "institutions": [],
+     "countries": [],
+     "is_corresponding": false,
+     "raw_author_name": "Oscar Castillo",
+     "raw_affiliation_strings": [
+      "Dobprotocol,Delaware,USA"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "Dobprotocol,Delaware,USA",
+       "institution_ids": []
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5095831797",
+      "display_name": "Eduardo Brito",
+      "orcid": "https://orcid.org/0009-0002-9996-6333",
+      "observed_orcids": [
+       "https://orcid.org/0009-0002-9996-6333"
+      ]
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I56085075",
+       "display_name": "University of Tartu",
+       "ror": "https://ror.org/03z77qz90",
+       "country_code": "EE",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I56085075"
+       ]
+      }
+     ],
+     "countries": [
+      "EE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Eduardo Brito",
+     "raw_affiliation_strings": [
+      "Cybernetica AS University of Tartu,Tartu,Estonia"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "Cybernetica AS University of Tartu,Tartu,Estonia",
+       "institution_ids": [
+        "https://openalex.org/I56085075"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "last",
+     "author": {
+      "id": "https://openalex.org/A5119771113",
+      "display_name": "Simon Espinola",
+      "orcid": null,
+      "observed_orcids": []
+     },
+     "institutions": [],
+     "countries": [],
+     "is_corresponding": false,
+     "raw_author_name": "Simon Espinola",
+     "raw_affiliation_strings": [
+      "Dobprotocol,Delaware,USA"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "Dobprotocol,Delaware,USA",
+       "institution_ids": []
+      }
+     ]
+    }
+   ],
+   "primary_location": {
+    "id": "doi:10.1109/icbc64466.2025.11185065",
+    "doi": "https://doi.org/10.1109/icbc64466.2025.11185065",
+    "is_oa": false,
+    "landing_page_url": "https://doi.org/10.1109/icbc64466.2025.11185065",
+    "pdf_url": null,
+    "source": {
+     "id": "https://openalex.org/S4363608612",
+     "display_name": "IEEE International Conference on Blockchain and Cryptocurrency (ICBC)",
+     "issn_l": null,
+     "issn": null,
+     "is_oa": false,
+     "is_in_doaj": false,
+     "is_core": false,
+     "listed_in": [],
+     "host_organization": null,
+     "host_organization_name": null,
+     "host_organization_lineage": [],
+     "host_organization_lineage_names": [],
+     "type": "conference"
+    },
+    "license": null,
+    "license_id": null,
+    "version": "publishedVersion",
+    "is_accepted": true,
+    "is_published": true,
+    "raw_source_name": "2025 IEEE International Conference on Blockchain and Cryptocurrency (ICBC)",
+    "raw_type": "proceedings-article"
+   },
+   "locations": [
+    {
+     "id": "doi:10.1109/icbc64466.2025.11185065",
+     "doi": "https://doi.org/10.1109/icbc64466.2025.11185065",
+     "is_oa": false,
+     "landing_page_url": "https://doi.org/10.1109/icbc64466.2025.11185065",
+     "pdf_url": null,
+     "source": {
+      "id": "https://openalex.org/S4363608612",
+      "display_name": "IEEE International Conference on Blockchain and Cryptocurrency (ICBC)",
+      "issn_l": null,
+      "issn": null,
+      "is_oa": false,
+      "is_in_doaj": false,
+      "is_core": false,
+      "listed_in": [],
+      "host_organization": null,
+      "host_organization_name": null,
+      "host_organization_lineage": [],
+      "host_organization_lineage_names": [],
+      "type": "conference"
+     },
+     "license": null,
+     "license_id": null,
+     "version": "publishedVersion",
+     "is_accepted": true,
+     "is_published": true,
+     "raw_source_name": "2025 IEEE International Conference on Blockchain and Cryptocurrency (ICBC)",
+     "raw_type": "proceedings-article"
+    },
+    {
+     "id": "pmh:oai:arXiv.org:2504.15676",
+     "doi": null,
+     "is_oa": true,
+     "landing_page_url": "http://arxiv.org/abs/2504.15676",
+     "pdf_url": "https://arxiv.org/pdf/2504.15676",
+     "source": {
+      "id": "https://openalex.org/S4306400194",
+      "display_name": "arXiv (Cornell University)",
+      "issn_l": "2331-8422",
+      "issn": [
+       "2331-8422"
+      ],
+      "is_oa": true,
+      "is_in_doaj": false,
+      "is_core": false,
+      "listed_in": [],
+      "host_organization": "https://openalex.org/I205783295",
+      "host_organization_name": "Cornell University",
+      "host_organization_lineage": [
+       "https://openalex.org/I205783295"
+      ],
+      "host_organization_lineage_names": [],
+      "type": "repository"
+     },
+     "license": null,
+     "license_id": null,
+     "version": "submittedVersion",
+     "is_accepted": false,
+     "is_published": false,
+     "raw_source_name": null,
+     "raw_type": "text"
+    },
+    {
+     "id": "doi:10.48550/arxiv.2504.15676",
+     "doi": "https://doi.org/10.48550/arxiv.2504.15676",
+     "is_oa": true,
+     "landing_page_url": "https://doi.org/10.48550/arxiv.2504.15676",
+     "pdf_url": null,
+     "source": {
+      "id": "https://openalex.org/S4306400194",
+      "display_name": "arXiv (Cornell University)",
+      "issn_l": "2331-8422",
+      "issn": [
+       "2331-8422"
+      ],
+      "is_oa": true,
+      "is_in_doaj": false,
+      "is_core": false,
+      "listed_in": [],
+      "host_organization": "https://openalex.org/I205783295",
+      "host_organization_name": "Cornell University",
+      "host_organization_lineage": [
+       "https://openalex.org/I205783295"
+      ],
+      "host_organization_lineage_names": [],
+      "type": "repository"
+     },
+     "license": null,
+     "license_id": null,
+     "version": null,
+     "is_accepted": false,
+     "is_published": null,
+     "raw_source_name": null,
+     "raw_type": "Preprint"
+    }
+   ],
+   "ids": {
+    "openalex": "https://openalex.org/W4414632071",
+    "doi": "https://doi.org/10.1109/icbc64466.2025.11185065"
+   },
+   "type": "conference-paper"
+  },
+  {
+   "id": "https://openalex.org/W7208821528",
+   "doi": "https://doi.org/10.5281/zenodo.22316806",
+   "display_name": "Decentralized Machine Learning for Autonomous Vehicle Control",
+   "publication_date": "2026-09-05",
+   "authorships": [
+    {
+     "author_position": "first",
+     "author": {
+      "id": "https://openalex.org/A5148816175",
+      "display_name": "Jincheng Zhang",
+      "orcid": null,
+      "observed_orcids": []
+     },
+     "institutions": [],
+     "countries": [],
+     "is_corresponding": true,
+     "raw_author_name": "Zhang, Jincheng",
+     "raw_affiliation_strings": [],
+     "raw_orcid": null,
+     "affiliations": []
+    }
+   ],
+   "primary_location": {
+    "id": "doi:10.5281/zenodo.22316806",
+    "doi": "https://doi.org/10.5281/zenodo.22316806",
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.5281/zenodo.22316806",
+    "pdf_url": null,
+    "source": {
+     "id": "https://openalex.org/S4306400562",
+     "display_name": "Zenodo (CERN European Organization for Nuclear Research)",
+     "issn_l": null,
+     "issn": null,
+     "is_oa": true,
+     "is_in_doaj": false,
+     "is_core": false,
+     "listed_in": [],
+     "host_organization": "https://openalex.org/I67311998",
+     "host_organization_name": "European Organization for Nuclear Research",
+     "host_organization_lineage": [
+      "https://openalex.org/I67311998"
+     ],
+     "host_organization_lineage_names": [],
+     "type": "repository"
+    },
+    "license": "cc-by",
+    "license_id": "https://openalex.org/licenses/cc-by",
+    "version": null,
+    "is_accepted": false,
+    "is_published": false,
+    "raw_source_name": null,
+    "raw_type": "Preprint"
+   },
+   "locations": [
+    {
+     "id": "doi:10.5281/zenodo.22316806",
+     "doi": "https://doi.org/10.5281/zenodo.22316806",
+     "is_oa": true,
+     "landing_page_url": "https://doi.org/10.5281/zenodo.22316806",
+     "pdf_url": null,
+     "source": {
+      "id": "https://openalex.org/S4306400562",
+      "display_name": "Zenodo (CERN European Organization for Nuclear Research)",
+      "issn_l": null,
+      "issn": null,
+      "is_oa": true,
+      "is_in_doaj": false,
+      "is_core": false,
+      "listed_in": [],
+      "host_organization": "https://openalex.org/I67311998",
+      "host_organization_name": "European Organization for Nuclear Research",
+      "host_organization_lineage": [
+       "https://openalex.org/I67311998"
+      ],
+      "host_organization_lineage_names": [],
+      "type": "repository"
+     },
+     "license": "cc-by",
+     "license_id": "https://openalex.org/licenses/cc-by",
+     "version": null,
+     "is_accepted": false,
+     "is_published": null,
+     "raw_source_name": null,
+     "raw_type": "Preprint"
+    },
+    {
+     "id": "doi:10.5281/zenodo.22316807",
+     "doi": "https://doi.org/10.5281/zenodo.22316807",
+     "is_oa": true,
+     "landing_page_url": "https://doi.org/10.5281/zenodo.22316807",
+     "pdf_url": null,
+     "source": {
+      "id": "https://openalex.org/S4306400562",
+      "display_name": "Zenodo (CERN European Organization for Nuclear Research)",
+      "issn_l": null,
+      "issn": null,
+      "is_oa": true,
+      "is_in_doaj": false,
+      "is_core": false,
+      "listed_in": [],
+      "host_organization": "https://openalex.org/I67311998",
+      "host_organization_name": "European Organization for Nuclear Research",
+      "host_organization_lineage": [
+       "https://openalex.org/I67311998"
+      ],
+      "host_organization_lineage_names": [],
+      "type": "repository"
+     },
+     "license": "cc-by",
+     "license_id": "https://openalex.org/licenses/cc-by",
+     "version": null,
+     "is_accepted": false,
+     "is_published": null,
+     "raw_source_name": null,
+     "raw_type": "Preprint"
+    }
+   ],
+   "ids": {
+    "openalex": "https://openalex.org/W7208821528",
+    "doi": "https://doi.org/10.5281/zenodo.22316806"
+   },
+   "type": "preprint"
+  }
+ ],
+ "group_by": []
+}
