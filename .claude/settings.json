@@ -8,7 +8,20 @@
     "deny": [
       "Edit(research/projects/**/papers.json)",
       "Edit(research/projects/**/search-log.json)",
-      "Edit(research/projects/**/project.yaml)"
+      "Edit(research/projects/**/project.yaml)",
+      "Edit(research/projects/**/evidence-matrix.json)",
+      "Edit(research/projects/**/gaps.json)",
+      "Edit(research/projects/**/alignment.json)",
+      "Edit(research/projects/**/gate-1.json)",
+      "Write(research/projects/**/gate-1.json)",
+      "Bash(.venv/bin/research-lab gate approve*)",
+      "Bash(.venv/bin/research-lab gate revise*)",
+      "Bash(*research-lab gate approve*)",
+      "Bash(*research-lab gate revise*)",
+      "Bash(*decide_gate_1*)",
+      "Edit(knowledge/papers/**)",
+      "Write(knowledge/papers/**)",
+      "Bash(sqlite3 *)"
     ]
   }
 }

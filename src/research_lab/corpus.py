@@ -12,10 +12,18 @@ from research_lab.validation.references import find_duplicate, normalize_title
 _FILLABLE = ("authors", "abstract", "published", "venue", "work_type", "doi", "arxiv_id", "openalex_id", "url")
 
 
+_IDENTIFIERS = ("doi", "arxiv_id", "openalex_id")
+
+
 @dataclass
 class MergeReport:
     new_paper_ids: list[str] = field(default_factory=list)
     matched_paper_ids: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    @property
+    def touched_paper_ids(self) -> list[str]:
+        return [*self.new_paper_ids, *self.matched_paper_ids]
 
 
 def _next_id(papers: list[Paper]) -> str:
@@ -23,11 +31,27 @@ def _next_id(papers: list[Paper]) -> str:
     return f"PAPER-{highest + 1:03d}"
 
 
-def _fill_missing(paper: Paper, metadata: PaperMetadata) -> None:
-    """Complète sans jamais écraser une valeur déjà présente : la première source fait foi."""
+def _fill_missing(paper: Paper, metadata: PaperMetadata, papers: list[Paper]) -> list[str]:
+    """Complète sans jamais écraser une valeur déjà présente : la première source fait foi.
+
+    Un identifiant déjà attribué à une autre publication n'est pas recopié : les deux
+    entrées désignent probablement le même travail, ce qui est signalé sans fusion automatique.
+    """
+    warnings = []
     for name in _FILLABLE:
-        if not getattr(paper, name) and getattr(metadata, name):
-            setattr(paper, name, getattr(metadata, name))
+        value = getattr(metadata, name)
+        if getattr(paper, name) or not value:
+            continue
+        if name in _IDENTIFIERS:
+            owner = next((p for p in papers if p is not paper and getattr(p, name) == value), None)
+            if owner is not None:
+                warnings.append(
+                    f"{paper.paper_id} et {owner.paper_id} semblent être la même publication "
+                    f"({name}={value}) : à vérifier manuellement"
+                )
+                continue
+        setattr(paper, name, value)
+    return warnings
 
 
 def merge_hits(
@@ -58,7 +82,7 @@ def merge_hits(
             papers.append(paper)
             report.new_paper_ids.append(paper.paper_id)
             continue
-        _fill_missing(existing, hit.metadata)
+        report.warnings.extend(w for w in _fill_missing(existing, hit.metadata, papers) if w not in report.warnings)
         if not any(p.source == provenance.source and p.source_id == provenance.source_id and p.search_id == search_id
                    for p in existing.provenance):
             existing.provenance.append(provenance)

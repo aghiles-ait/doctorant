@@ -12,9 +12,9 @@ class Source(StrEnum):
 
 
 class PaperStatus(StrEnum):
-    CANDIDATE = "candidate"  # trouvé par la veille, pas encore qualifié
-    RETAINED = "retained"  # retenu pour l'état de l'art (sprint 2)
-    EXCLUDED = "excluded"
+    CANDIDATE = "candidate"  # trouvé par la veille, pas encore trié
+    INCLUDED = "included"  # retenu pour l'état de l'art
+    EXCLUDED = "excluded"  # hors périmètre (voir scope.md)
 
 
 class PaperMetadata(BaseModel):
@@ -64,4 +64,21 @@ class Paper(PaperMetadata):
     def _require_identifier(self) -> "Paper":
         if not self.has_identifier():
             raise ValueError(f"{self.paper_id}: aucun identifiant externe (DOI, arXiv ou OpenAlex)")
+        return self
+
+
+class ScreeningDecision(BaseModel):
+    """Décision d'inclusion ou d'exclusion d'une publication dans un projet."""
+
+    project_id: str
+    paper_id: str
+    decision: PaperStatus
+    reason: str = Field(min_length=1)
+    actor: str
+    at: datetime
+
+    @model_validator(mode="after")
+    def _not_candidate(self) -> "ScreeningDecision":
+        if self.decision == PaperStatus.CANDIDATE:
+            raise ValueError("une décision de tri est « included » ou « excluded »")
         return self

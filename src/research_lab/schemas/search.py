@@ -47,13 +47,16 @@ class SearchExecution(BaseModel):
 
     search_id: str = Field(pattern=r"^SEARCH-\d{3,}$")
     project_id: str
+    # Recherche contradictoire (Q3) : gap dont on cherche des travaux qui le combleraient déjà.
+    gap_id: str | None = None
     query: SearchQuery
     sources: list[Source]
     started_at: datetime
     finished_at: datetime
     status: SearchStatus
     results: list[SourceResult]
-    new_paper_ids: list[str] = Field(default_factory=list)
-    matched_paper_ids: list[str] = Field(default_factory=list)
+    new_paper_ids: list[str] = Field(default_factory=list)  # ajoutées au projet par cette recherche
+    matched_paper_ids: list[str] = Field(default_factory=list)  # déjà présentes dans le projet
+    merge_warnings: list[str] = Field(default_factory=list)  # doublons probables non fusionnés
     tool_version: str
     config_hash: str

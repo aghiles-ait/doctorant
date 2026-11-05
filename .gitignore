@@ -5,5 +5,8 @@ __pycache__/
 .env
 .claude/settings.local.json
 knowledge/research.db
+knowledge/research.db-*
+# PDF et texte extrait : volumineux et soumis aux licences des éditeurs.
+knowledge/papers/
 *.tmp
 research

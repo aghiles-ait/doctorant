@@ -26,3 +26,12 @@ providers:
     # Authentification : variables OPENALEX_API_KEY et OPENALEX_MAILTO (voir .env.example).
 
 # Semantic Scholar et Crossref : connecteurs prévus dans un sprint ultérieur.
+
+# Texte intégral (research-lab fulltext fetch) : versions en accès libre uniquement.
+fulltext:
+  # Miroir d'arXiv prévu pour l'accès automatisé.
+  arxiv_pdf_url: https://export.arxiv.org/pdf
+  timeout_seconds: 60
+  min_interval_seconds: 3
+  max_pdf_mb: 50
+  min_extracted_chars: 500

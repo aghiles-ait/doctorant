@@ -1,3 +1,18 @@
 version: "1.0"
 
-# Pondération et calcul des scores de priorisation des gaps : sprint 2 (gap-analysis, values-alignment).
+# Priorisation des gaps (skill values-alignment, `research-lab alignment set`).
+#
+# alignement      = moyenne des scores des valeurs applicables, pondérée par leur poids
+#                   (config/research-values.yaml), ramenée entre 0 et 1.
+# force des preuves = valeur associée à `evidence_strength` du gap, entre 0 et 1.
+# priorité        = somme pondérée des deux, entre 0 et 1.
+#
+# Le classement aide à préparer la Gate 1 ; il ne décide pas à la place de l'humain.
+priority:
+  weights:
+    alignment: 0.5
+    evidence_strength: 0.5
+  evidence_strength:
+    low: 0.0
+    medium: 0.5
+    high: 1.0

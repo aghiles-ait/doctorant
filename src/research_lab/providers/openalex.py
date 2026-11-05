@@ -81,17 +81,22 @@ def parse_work(work: dict) -> tuple[SourceHit | None, list[str]]:
     return SourceHit(source=Source.OPENALEX, source_id=openalex_id, metadata=metadata), warnings
 
 
+def auth_params() -> dict[str, str]:
+    """Paramètres d'authentification OpenAlex lus dans l'environnement (voir .env.example)."""
+    auth = {}
+    if api_key := os.environ.get("OPENALEX_API_KEY"):
+        auth["api_key"] = api_key
+    if mailto := os.environ.get("OPENALEX_MAILTO"):
+        auth["mailto"] = mailto
+    return auth
+
+
 class OpenAlexProvider:
     source = Source.OPENALEX
 
     def __init__(self, config: ProviderConfig, retry: RetryConfig, sleep: Callable[[float], None] = time.sleep) -> None:
         self._config = config
-        auth = {}
-        if api_key := os.environ.get("OPENALEX_API_KEY"):
-            auth["api_key"] = api_key
-        if mailto := os.environ.get("OPENALEX_MAILTO"):
-            auth["mailto"] = mailto
-        self._http = HttpClient(config, retry, sleep=sleep, params=auth)
+        self._http = HttpClient(config, retry, sleep=sleep, params=auth_params())
 
     def search(self, query: SearchQuery) -> ProviderResult:
         filter_ = build_filter(query)

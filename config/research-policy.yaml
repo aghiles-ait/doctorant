@@ -7,6 +7,16 @@ literature_search:
   # Autorise l'option --allow-partial (fusion des résultats quand une source échoue).
   allow_partial_search: false
 
+literature_review:
+  # Longueur minimale d'un extrait cité comme preuve (lettres et chiffres, hors espaces et ponctuation).
+  # Un extrait trop court pourrait être retrouvé par hasard dans le texte.
+  min_quote_chars: 20
+
+gap_analysis:
+  # Un gap ne passe au statut `supported` qu'appuyé par des preuves d'au moins ce nombre de
+  # publications distinctes, et après au moins une recherche contradictoire (Q3).
+  min_supporting_papers: 2
+
 # Règles que l'agent doit respecter (spec §8). Contrôles automatisés à partir du sprint 2.
 scientific_quality:
   never_fabricate_references: true
