@@ -25,6 +25,8 @@ L'agent crée le projet, rédige `scope.md`, puis exécute le skill `scientific-
 
 ## Utilisation directe de la CLI
 
+### Périmètre et recherche bibliographique
+
 ```bash
 L=.venv/bin/research-lab
 $L project init decentralized-ai-governance --topic "Decentralized AI governance"
@@ -41,7 +43,7 @@ $L search-log decentralized-ai-governance
 
 Les commandes acceptent `--json` pour une sortie exploitable par les Skills.
 
-### État de l'art (étape 2b)
+### État de l'art
 
 ```bash
 $L project transition decentralized-ai-governance LITERATURE_REVIEW   # exige corpus check OK
@@ -70,7 +72,7 @@ ignore la casse, les accents, la ponctuation et les espaces, pour tolérer les a
 d'extraction des PDF. Elle ne juge pas si l'extrait soutient l'affirmation : c'est le rôle du
 reviewer (sprint 3) et de la Gate 1.
 
-### Gaps et alignement sur les valeurs (étape 2c)
+### Gaps et alignement sur les valeurs
 
 ```bash
 # brouillon JSON écrit par l'agent (champs : voir .claude/skills/gap-analysis/SKILL.md)
@@ -97,7 +99,7 @@ valeur reçoit un score justifié, avec les compromis entre valeurs. La priorit�
 alignement avec la force des preuves (`config/scoring.yaml`). Réviser un gap ou modifier les
 valeurs rend son évaluation périmée.
 
-### Gate 1 : validation humaine de la problématique (étape 2d)
+### Gate 1 : validation humaine
 
 ```bash
 $L gate submit decentralized-ai-governance    # l'agent soumet (refusé si `gap check` est BLOCKED)
@@ -160,14 +162,16 @@ de tes données de recherche.
   horodatages, nombre de résultats, erreurs, version de l'outil et empreinte de configuration.
 - Agent `doctorant` (étapes 1 et 2) et skill `scientific-watch`.
 
-**Sprint 2 — étape 2a implémentée**
+**Sprint 2 — implémenté**
+
+*Base de données*
 - Base SQLite partagée, migrations numérotées, import sans perte des projets du sprint 1.
 - Garanties portées par la base : identifiants immuables, publications et journal jamais
   supprimés, toute publication a au moins un identifiant externe, écritures en une transaction.
 - Déduplication sur toute la base ; doublons probables signalés (`merge_warnings`) quand deux
   publications existantes se révèlent identiques, plutôt que fusionnées automatiquement.
 
-**Sprint 2 — étape 2b implémentée**
+*État de l'art*
 - Tri des publications (`included` / `excluded`) avec justification historisée.
 - Texte intégral : PDF arXiv puis versions libres d'OpenAlex, texte extrait page par page,
   stocké dans `knowledge/papers/` et protégé par son empreinte.
@@ -176,7 +180,7 @@ de tes données de recherche.
 - Contrôle des citations de `literature-review.md` et transitions `LITERATURE_REVIEW` /
   `GAP_ANALYSIS` conditionnées. Skill `literature-review`, agent `doctorant` étape 3.
 
-**Sprint 2 — étape 2c implémentée**
+*Gaps et valeurs*
 - Gaps `GAP-xxx` versionnés (identifiant stable, historique en ajout seul), appuyés sur des
   preuves vérifiées ; règles de force des preuves, de statut et de nouveauté contrôlées par le code.
 - Recherches contradictoires rattachées à un gap (`--for-gap`), seules recherches permises en
@@ -184,7 +188,7 @@ de tes données de recherche.
 - Évaluation de chaque gap actif au regard de `research-values.yaml`, score de priorité,
   `gaps.json`, `alignment.json`, `gap check`. Skills `gap-analysis` et `values-alignment`.
 
-**Sprint 2 — étape 2d implémentée (sprint 2 terminé)**
+*Gate 1*
 - Gate 1 : soumission par l'agent avec empreintes des livrables, décision humaine
   (`approve` avec choix des gaps, ou `revise` avec instructions), enregistrée de façon immuable
   avec la transition dans une même transaction ; `gate-1.json`, `gate verify`.
