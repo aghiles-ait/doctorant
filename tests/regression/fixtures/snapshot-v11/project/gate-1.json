@@ -1,0 +1,42 @@
+[
+  {
+    "round": 1,
+    "submission": {
+      "project_id": "decentralized-ai-governance",
+      "gate": "gate_1",
+      "round": 1,
+      "submitted_at": "2026-11-24T13:06:15Z",
+      "actor": "aghilesaitmessaoud",
+      "artifacts": {
+        "scope.md": "sha256:ad7192b5c65b62ebccb86beedd161fe7a813db8020d7ba2ba8d8ef8ea2886173",
+        "literature-review.md": "sha256:8f380ac08e0c853331144b27f5aef3320b09f2829fa27c94664be87f6c8e8ba0",
+        "evidence-matrix.json": "sha256:4990c354f98e0ac086cafb4d02a3b483a97aa51bfaebcd0f6fc15a1f25761e0f",
+        "gaps.json": "sha256:111dfea93e24563979f8b10068c0d390f7c7ad6753c5fdad46999891f00b0467",
+        "alignment.json": "sha256:87336dc072e49d74e17b804182298a19631e8a48dbd61178dea984c5ff22787f"
+      },
+      "gap_versions": {
+        "GAP-001": 1
+      },
+      "question_versions": {},
+      "solution_versions": {},
+      "check_status": "NEEDS_MORE_RESEARCH",
+      "check_warnings": [
+        "aucun gap au statut supported"
+      ]
+    },
+    "decision": {
+      "project_id": "decentralized-ai-governance",
+      "gate": "gate_1",
+      "round": 1,
+      "decision": "approve",
+      "approver": "aghilesaitmessaoud",
+      "at": "2026-11-24T13:06:15Z",
+      "comment": "Gap retenu",
+      "selected_gaps": {
+        "GAP-001": 1
+      },
+      "artifacts_verified": true,
+      "modified_artifacts": []
+    }
+  }
+]

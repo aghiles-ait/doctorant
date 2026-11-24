@@ -5,7 +5,7 @@ argumenté, traçable et reproductible. La spécification complète est dans `sp
 
 **Avancement : sprints 1 à 3 terminés** : workflow complet, du sujet au Research Proposal validé
 à la Gate 2 (base SQLite partagée, preuves vérifiées, gaps et valeurs, Gate 1, questions et
-hypothèses, solutions comparées, revue critique indépendante, Proposal, Gate 2). Sprint 4 en cours : reprise (`project resume`), évaluation (`eval`) et coûts (`costs`) faits.
+hypothèses, solutions comparées, revue critique indépendante, Proposal, Gate 2). Sprint 4 en cours : reprise (`project resume`), évaluation (`eval`) coûts (`costs`) et non-régression (`tests/regression`) faits.
 
 ## Principe d'architecture
 
@@ -62,6 +62,10 @@ Python ≥ 3.12, environnement dans `.venv/` (voir README.md pour l'installation
   après chaque écriture. `drafts/` contient les brouillons JSON écrits par l'agent pour
   `gap add/revise`, `alignment set`, `question add/revise` et `solution add/revise/compare`.
 - `tests/unit`, `tests/integration` ; `tests/fixtures` contient des réponses réelles des APIs.
+  `tests/regression` : références `golden/` du scénario complet et instantanés `fixtures/snapshot-vN/`
+  d'anciennes versions. Ne jamais modifier un instantané ; après un changement voulu des exports,
+  `UPDATE_GOLDEN=1 .venv/bin/pytest tests/regression` et relire le diff ; après une migration, ajouter un
+  instantané (`REGRESSION_SNAPSHOT=1`).
 
 ## Règles
 

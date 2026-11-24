@@ -1,0 +1,163 @@
+{
+  "project_id": "decentralized-ai-governance",
+  "state": "COMPLETED",
+  "indicators": [
+    {
+      "control": "Q1",
+      "name": "publications incluses avec identifiant externe",
+      "value": "1/1 (100 %)",
+      "ok": true
+    },
+    {
+      "control": "Q1",
+      "name": "publications incluses avec provenance",
+      "value": "1/1 (100 %)",
+      "ok": true
+    },
+    {
+      "control": "Q1",
+      "name": "citations invalides dans literature-review.md",
+      "value": "0",
+      "ok": true
+    },
+    {
+      "control": "Q2",
+      "name": "publications incluses appuyées par au moins une preuve",
+      "value": "1/1 (100 %)",
+      "ok": null
+    },
+    {
+      "control": "Q2",
+      "name": "preuves localisées dans le texte intégral (page)",
+      "value": "1/1 (100 %)",
+      "ok": null
+    },
+    {
+      "control": "Q2",
+      "name": "textes intégraux lus en entier (texte principal)",
+      "value": "1/1 (100 %)",
+      "ok": true
+    },
+    {
+      "control": "Q3",
+      "name": "gaps avec une recherche contradictoire ayant ramené des résultats",
+      "value": "1/1 (100 %)",
+      "ok": true
+    },
+    {
+      "control": "Q3",
+      "name": "recherches contradictoires vides ou en échec",
+      "value": "0",
+      "ok": null
+    },
+    {
+      "control": "Q3",
+      "name": "gaps citant des preuves contraires",
+      "value": "0/1 (0 %)",
+      "ok": null
+    },
+    {
+      "control": "Q4",
+      "name": "hypothèses avec critère de réfutation",
+      "value": "1/1 (100 %)",
+      "ok": true
+    },
+    {
+      "control": "Q4",
+      "name": "hypothèses testées par au moins une solution",
+      "value": "1/1 (100 %)",
+      "ok": true
+    },
+    {
+      "control": "Q5",
+      "name": "recherches journalisées (requête, sources, dates, configuration)",
+      "value": "2",
+      "ok": true
+    },
+    {
+      "control": "Q5",
+      "name": "section Limites dans literature-review.md",
+      "value": "absente",
+      "ok": false
+    },
+    {
+      "control": "Q5",
+      "name": "recherches citées dans literature-review.md",
+      "value": "0/2 (0 %)",
+      "ok": null
+    },
+    {
+      "control": "Q5",
+      "name": "section Limites dans research-proposal.md",
+      "value": "présente",
+      "ok": true
+    },
+    {
+      "control": "Q5",
+      "name": "recherches citées dans research-proposal.md",
+      "value": "2/2 (100 %)",
+      "ok": null
+    },
+    {
+      "control": "revue",
+      "name": "tours de revue",
+      "value": "1",
+      "ok": null
+    },
+    {
+      "control": "revue",
+      "name": "dernier verdict",
+      "value": "ACCEPTABLE",
+      "ok": true
+    },
+    {
+      "control": "revue",
+      "name": "objections (critiques / majeures / mineures)",
+      "value": "0 / 1 / 0",
+      "ok": null
+    },
+    {
+      "control": "revue",
+      "name": "objections critiques ou majeures sans réponse (dernière revue)",
+      "value": "0",
+      "ok": null
+    },
+    {
+      "control": "revue",
+      "name": "réponses (révisé / réfuté / limite admise)",
+      "value": "0 / 0 / 1",
+      "ok": null
+    },
+    {
+      "control": "workflow",
+      "name": "transitions forcées",
+      "value": "0",
+      "ok": true
+    }
+  ],
+  "failed": [
+    "section Limites dans literature-review.md"
+  ],
+  "human_ratings": {
+    "GAP-001": {
+      "target": "GAP-001",
+      "target_version": 1,
+      "scores": {
+        "reality": 4,
+        "evidence": 3,
+        "importance": 5
+      },
+      "comment": "Manque réel"
+    },
+    "RQ-001/H1": {
+      "target": "RQ-001/H1",
+      "target_version": 2,
+      "scores": {
+        "falsifiability": 4,
+        "relevance": 4,
+        "testability": 3
+      },
+      "comment": ""
+    }
+  }
+}

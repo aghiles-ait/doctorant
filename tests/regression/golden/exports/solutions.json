@@ -1,0 +1,98 @@
+[
+  {
+    "question_id": "RQ-001",
+    "question": "Q ?",
+    "question_status": "active",
+    "solutions": [
+      {
+        "title": "A",
+        "question_id": "RQ-001",
+        "summary": "s",
+        "architecture": "a",
+        "addressed_hypotheses": [
+          "H1"
+        ],
+        "evaluation_plan": "e",
+        "tradeoffs": [
+          "t"
+        ],
+        "risks": [
+          "r"
+        ],
+        "evidence": [
+          "EV-001"
+        ],
+        "limitations": [],
+        "status": "proposed",
+        "solution_id": "SOL-001",
+        "project_id": "decentralized-ai-governance",
+        "version": 1,
+        "created_at": "<datetime>",
+        "updated_at": "<datetime>",
+        "actor": "<user>",
+        "reason": "création",
+        "cited_papers": [
+          "PAPER-001"
+        ]
+      },
+      {
+        "title": "B",
+        "question_id": "RQ-001",
+        "summary": "s",
+        "architecture": "a",
+        "addressed_hypotheses": [
+          "H1"
+        ],
+        "evaluation_plan": "e",
+        "tradeoffs": [
+          "t"
+        ],
+        "risks": [
+          "r"
+        ],
+        "evidence": [
+          "EV-001"
+        ],
+        "limitations": [],
+        "status": "proposed",
+        "solution_id": "SOL-002",
+        "project_id": "decentralized-ai-governance",
+        "version": 1,
+        "created_at": "<datetime>",
+        "updated_at": "<datetime>",
+        "actor": "<user>",
+        "reason": "création",
+        "cited_papers": [
+          "PAPER-001"
+        ]
+      }
+    ],
+    "comparison": {
+      "question_id": "RQ-001",
+      "criteria": [
+        "coût",
+        "vérifiabilité"
+      ],
+      "assessments": {
+        "SOL-001": {
+          "coût": "…",
+          "vérifiabilité": "…"
+        },
+        "SOL-002": {
+          "coût": "…",
+          "vérifiabilité": "…"
+        }
+      },
+      "recommendation": null,
+      "justification": "Le choix dépend du budget : laissé à l'humain.",
+      "version": 1,
+      "solution_versions": {
+        "SOL-001": 1,
+        "SOL-002": 1
+      },
+      "actor": "<user>",
+      "at": "<datetime>"
+    },
+    "comparison_stale": false
+  }
+]

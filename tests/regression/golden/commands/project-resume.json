@@ -1,0 +1,12 @@
+{
+  "project_id": "decentralized-ai-governance",
+  "state": "COMPLETED",
+  "since": "<datetime>",
+  "step": "terminé",
+  "action": "rien à faire",
+  "waiting_for_human": false,
+  "last_change_forced": false,
+  "human_instructions": "Gate 2 approve : Proposal accepté",
+  "next_steps": {},
+  "stale_exports": []
+}

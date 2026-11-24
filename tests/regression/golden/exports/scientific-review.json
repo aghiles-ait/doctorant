@@ -1,0 +1,50 @@
+[
+  {
+    "project_id": "decentralized-ai-governance",
+    "round": 1,
+    "verdict": "ACCEPTABLE",
+    "summary": "Cohérent.",
+    "objections": [
+      {
+        "severity": "major",
+        "targets": [
+          "SOL-002"
+        ],
+        "statement": "s",
+        "rationale": "r",
+        "suggestion": "",
+        "objection_id": "OBJ-001",
+        "round": 1,
+        "response": {
+          "action": "accepted_limitation",
+          "response": "Limite reportée dans le Proposal.",
+          "actor": "<user>",
+          "at": "<datetime>"
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "evidence_id": "EV-001",
+        "result": "supports",
+        "note": "conforme"
+      }
+    ],
+    "reviewer": "scientific-reviewer",
+    "at": "<datetime>",
+    "reviewed_artifacts": {
+      "literature-review.md": "sha256:<sha256>",
+      "evidence-matrix.json": "sha256:<sha256>",
+      "gaps.json": "sha256:<sha256>",
+      "research-questions.json": "sha256:<sha256>",
+      "solutions.json": "sha256:<sha256>"
+    },
+    "question_versions": {
+      "RQ-001": 2
+    },
+    "solution_versions": {
+      "SOL-001": 1,
+      "SOL-002": 1
+    }
+  }
+]

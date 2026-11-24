@@ -355,6 +355,12 @@ de tes données de recherche.
   sous-agent et de chaque session. `costs report [<id>]` : coût en équivalent API (prix de
   `config/costs.yaml`) par agent, état du workflow et modèle. Seuls les agents de recherche sont attribués
   à un projet ; le développement du laboratoire est compté à part (`main`).
+- Non-régression (`tests/regression/`) : une migration publiée ne change plus ; toute base, à n'importe
+  quelle version du schéma, se met à jour ; le scénario complet (du sujet à la Gate 2) produit les mêmes
+  livrables et sorties de contrôle que les références de `golden/` ; les instantanés `fixtures/snapshot-vN/`
+  d'anciennes versions restent lisibles, exports identiques et validations vérifiables. Après un changement
+  voulu : `UPDATE_GOLDEN=1 .venv/bin/pytest tests/regression`, puis relire le diff ; après une migration,
+  ajouter un instantané avec `REGRESSION_SNAPSHOT=1`.
 
 **Non implémenté**
 - Connecteurs Semantic Scholar et Crossref ; vérification de l'existence des DOI auprès de Crossref.

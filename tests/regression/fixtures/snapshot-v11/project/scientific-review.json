@@ -1,0 +1,50 @@
+[
+  {
+    "project_id": "decentralized-ai-governance",
+    "round": 1,
+    "verdict": "ACCEPTABLE",
+    "summary": "Cohérent.",
+    "objections": [
+      {
+        "severity": "major",
+        "targets": [
+          "SOL-002"
+        ],
+        "statement": "s",
+        "rationale": "r",
+        "suggestion": "",
+        "objection_id": "OBJ-001",
+        "round": 1,
+        "response": {
+          "action": "accepted_limitation",
+          "response": "Limite reportée dans le Proposal.",
+          "actor": "aghilesaitmessaoud",
+          "at": "2026-11-24T13:06:15Z"
+        }
+      }
+    ],
+    "verifications": [
+      {
+        "evidence_id": "EV-001",
+        "result": "supports",
+        "note": "conforme"
+      }
+    ],
+    "reviewer": "scientific-reviewer",
+    "at": "2026-11-24T13:06:15Z",
+    "reviewed_artifacts": {
+      "literature-review.md": "sha256:8f380ac08e0c853331144b27f5aef3320b09f2829fa27c94664be87f6c8e8ba0",
+      "evidence-matrix.json": "sha256:4990c354f98e0ac086cafb4d02a3b483a97aa51bfaebcd0f6fc15a1f25761e0f",
+      "gaps.json": "sha256:111dfea93e24563979f8b10068c0d390f7c7ad6753c5fdad46999891f00b0467",
+      "research-questions.json": "sha256:c2645e114cabbe22e7ccb3ffcc013c4d547e89e93cbb3ae9cb26e9381e87aeb7",
+      "solutions.json": "sha256:5e8aa9466d23222a085a7ab57cf8f0432b6df04fceb80942e0b94f9d8fccafad"
+    },
+    "question_versions": {
+      "RQ-001": 2
+    },
+    "solution_versions": {
+      "SOL-001": 1,
+      "SOL-002": 1
+    }
+  }
+]
