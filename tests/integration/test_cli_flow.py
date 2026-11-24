@@ -137,6 +137,13 @@ def test_literature_review_flow(project_ready, apis, lab_root):
     assert refused.exit_code == 1 and "NEEDS_MORE_RESEARCH" in refused.output
     policy_file = lab_root / "config" / "research-policy.yaml"
     policy_file.write_text(policy_file.read_text().replace("min_corpus_size: 20", "min_corpus_size: 3"))
+    # Les réponses enregistrées annoncent plus de résultats que ceux examinés : recherche à compléter.
+    capped = invoke("corpus", "check", PROJECT)
+    assert capped.exit_code == 0 and "NEEDS_MORE_RESEARCH" in capped.output and "--max-results" in capped.output
+    assert invoke("project", "transition", PROJECT, "LITERATURE_REVIEW").exit_code == 1
+    # Au-delà de max_examinable_results, la requête est jugée trop large : simple avertissement.
+    policy_file.write_text(policy_file.read_text().replace("max_examinable_results: 300", "max_examinable_results: 1"))
+    assert "requête trop large" in invoke("corpus", "check", PROJECT).output
     assert invoke("project", "transition", PROJECT, "LITERATURE_REVIEW").exit_code == 0
 
     papers = {p["arxiv_id"] or p["openalex_id"]: p["paper_id"] for p in json.loads(invoke("corpus", "list", PROJECT, "--json").output)}
@@ -153,6 +160,11 @@ def test_literature_review_flow(project_ready, apis, lab_root):
     )
     fetched = invoke("fulltext", "fetch", PROJECT)
     assert fetched.exit_code == 0 and "1 available" in fetched.output
+    outline = invoke("fulltext", "show", PROJECT, dam).output
+    assert "0/2 pages du texte principal lues" in outline and "Decentralized Autonomous Machines" in outline
+    early = invoke("evidence", "add", PROJECT, "--paper", dam, "--claim", "x", "--type", "position",
+                   "--quote", "extend autonomy into the physical world", "--page", "2")
+    assert early.exit_code == 1 and "jamais affichée" in early.output
     assert "page 2/2" in invoke("fulltext", "show", PROJECT, dam, "--page", "2").output
 
     invented = invoke("evidence", "add", PROJECT, "--paper", dam, "--claim", "x", "--type", "position",
@@ -167,12 +179,19 @@ def test_literature_review_flow(project_ready, apis, lab_root):
     assert invoke("review", "check", PROJECT).exit_code == 2
     assert invoke("project", "transition", PROJECT, "GAP_ANALYSIS").exit_code == 1
     review.write_text(f"# État de l'art\nLes DAM étendent l'autonomie [{dam}, EV-001].\n")
+    unread = invoke("review", "check", PROJECT)  # page 1 jamais affichée
+    assert unread.exit_code == 2 and "jamais affichées : 1" in unread.output
+    assert invoke("project", "transition", PROJECT, "GAP_ANALYSIS").exit_code == 1
+    assert "page 1/2" in invoke("fulltext", "show", PROJECT, dam, "--pages", "1-2").output
+    assert "1/1 textes intégraux disponibles lus en entier" in invoke("fulltext", "status", PROJECT).output
     assert invoke("review", "check", PROJECT).exit_code == 0
     assert invoke("project", "transition", PROJECT, "GAP_ANALYSIS").exit_code == 0
 
     matrix = json.loads((project_ready / "evidence-matrix.json").read_text())
     assert matrix == [{
         "paper_id": dam, "title": matrix[0]["title"], "year": 2025, "fulltext_status": "available",
+        "reading": {"page_count": 2, "main_pages": 2, "references_from": None, "pages_read": [1, 2],
+                    "unread_main_pages": [], "complete": True},
         "evidence": [{"evidence_id": "EV-001", "evidence_type": "position", "claim": "Les DAM étendent l'autonomie au monde physique",
                       "quote": "extend autonomy into the physical world", "location": "full_text", "page": 2}],
     }]

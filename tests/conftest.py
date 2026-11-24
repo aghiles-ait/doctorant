@@ -56,7 +56,7 @@ def lab_root(tmp_path, monkeypatch) -> Path:
     shutil.copytree(REPO_ROOT / "config", tmp_path / "config")
     sources_file = tmp_path / "config" / "academic-sources.yaml"
     sources = yaml.safe_load(sources_file.read_text())
-    sources["retry"]["backoff_seconds"] = 0
+    sources["retry"]["delays_seconds"] = [0]
     for provider in sources["providers"].values():
         provider["min_interval_seconds"] = 0
     sources["fulltext"]["min_interval_seconds"] = 0

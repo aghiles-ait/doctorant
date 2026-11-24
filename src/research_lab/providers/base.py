@@ -16,6 +16,15 @@ USER_AGENT = f"ai-research-doctorant/{__version__}"
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
+def parse_retry_after(value: str | None) -> float | None:
+    """Délai `Retry-After` en secondes (la forme date HTTP est ignorée : on retombe sur les délais configurés)."""
+    try:
+        seconds = float(value) if value is not None else None
+    except ValueError:
+        return None
+    return seconds if seconds is not None and seconds >= 0 else None
+
+
 class ProviderError(Exception):
     """Échec d'une source après épuisement des relances."""
 
@@ -56,22 +65,25 @@ class HttpClient:
         )
 
     def get(self, url: str, params: dict[str, str | int]) -> httpx.Response:
-        last_error = ""
+        attempts: list[str] = []
         for attempt in range(1, self._retry.max_attempts + 1):
             self._throttle()
+            retry_after = None
             try:
                 response = self._client.get(url, params=params)
             except httpx.TransportError as exc:
-                last_error = f"{type(exc).__name__}: {exc}"
+                attempts.append(f"{type(exc).__name__}: {exc}")
             else:
                 if response.status_code not in _RETRYABLE_STATUS:
                     if response.is_error:
                         raise ProviderError(f"HTTP {response.status_code} sur {response.url}")
                     return response
-                last_error = f"HTTP {response.status_code} sur {response.url}"
+                attempts.append(f"HTTP {response.status_code} sur {response.url}")
+                retry_after = parse_retry_after(response.headers.get("retry-after"))
             if attempt < self._retry.max_attempts:
-                self._sleep(self._retry.backoff_seconds * 2 ** (attempt - 1))
-        raise ProviderError(f"Échec après {self._retry.max_attempts} tentatives : {last_error}")
+                self._sleep(self._retry.delay(attempt, retry_after))
+        detail = " ; ".join(f"{i}) {a}" for i, a in enumerate(attempts, start=1))
+        raise ProviderError(f"Échec après {self._retry.max_attempts} tentatives : {detail}")
 
     def _throttle(self) -> None:
         now = time.monotonic()

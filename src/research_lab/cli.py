@@ -19,6 +19,7 @@ from research_lab.schemas.gap import AlignmentDraft, GapDraft
 from research_lab.proposal import ProposalError, check_proposal_file, write_references
 from research_lab.providers import build_providers
 from research_lab.questions import QuestionError, add_question, check_questions, revise_question
+from research_lab.reading import check_reading, coverage, outline, parse_page_range, select_pages
 from research_lab.review import ReviewError, add_evidence, decide, fetch_fulltexts, withdraw_evidence
 from research_lab.schemas.evidence import EvidenceType, FulltextStatus
 from research_lab.schemas.paper import PaperStatus, Source
@@ -114,7 +115,7 @@ def _settings_and_db() -> tuple[Settings, Database]:
 
 def _context(project_id: str) -> tuple[Settings, ProjectRepository]:
     settings, db = _settings_and_db()
-    return settings, ProjectRepository(db, settings.projects_dir, project_id)
+    return settings, ProjectRepository(db, settings.projects_dir, project_id, settings.papers_dir)
 
 
 def _require_project(repo: ProjectRepository) -> None:
@@ -338,7 +339,10 @@ def corpus_check(project_id: ProjectId, as_json: JsonFlag = False) -> None:
     """Contrôle l'intégrité du corpus : renvoie OK, NEEDS_MORE_RESEARCH ou BLOCKED."""
     settings, repo = _context(project_id)
     _require_project(repo)
-    result = check_corpus(repo.load_papers(), repo.load_search_log(), settings.policy.min_corpus_size)
+    result = check_corpus(
+        repo.load_papers(), repo.load_search_log(), settings.policy.min_corpus_size,
+        settings.policy.max_examinable_results,
+    )
     if as_json:
         _print_json({"status": result.status, "paper_count": result.paper_count, "errors": result.errors, "warnings": result.warnings})
     else:
@@ -383,19 +387,28 @@ def fulltext_status(project_id: ProjectId, as_json: JsonFlag = False) -> None:
         if p.status != PaperStatus.INCLUDED:
             continue
         record = load_fulltext(repo.db, p.paper_id)
+        try:
+            reading = repo.paper_coverage(p.paper_id)
+        except FulltextTampered as exc:
+            _fail(str(exc))
         rows.append({
             "paper_id": p.paper_id,
             "status": record.status if record else "not_attempted",
             "pages": record.page_count if record else None,
             "error": record.error if record else None,
+            "reading": reading.as_dict() if reading else None,
+            "reading_summary": reading.summary() if reading else None,
             "title": p.title,
         })
     if as_json:
         _print_json(rows)
         return
     for r in rows:
-        detail = f"{r['pages']} pages" if r["pages"] else (r["error"] or "")
-        typer.echo(f"{r['paper_id']}  {r['status']:<13}  {r['title'][:60]:<60}  {detail[:80]}")
+        detail = r["reading_summary"] or r["error"] or ""
+        typer.echo(f"{r['paper_id']}  {r['status']:<13}  {r['title'][:60]:<60}  {detail[:120]}")
+    complete = sum(1 for r in rows if r["reading"] and r["reading"]["complete"])
+    available = sum(1 for r in rows if r["reading"])
+    typer.echo(f"{complete}/{available} textes intégraux disponibles lus en entier (texte principal)")
 
 
 @fulltext_app.command("show")
@@ -403,21 +416,52 @@ def fulltext_show(
     project_id: ProjectId,
     paper_id: Annotated[str, typer.Argument()],
     page: Annotated[int | None, typer.Option(help="Afficher une seule page")] = None,
+    pages: Annotated[str | None, typer.Option(help="Afficher une plage de pages, par exemple 3-7")] = None,
+    as_json: JsonFlag = False,
 ) -> None:
-    """Affiche le texte intégral extrait, avec les numéros de page à citer dans les preuves."""
+    """Sans option : plan du texte (pages, taille, lues ou non). Avec --page/--pages : texte à citer.
+
+    Chaque appel affiche au plus `fulltext.max_show_chars` caractères (une sortie trop longue peut être
+    tronquée avant d'atteindre le modèle) ; les pages affichées sont enregistrées comme lues.
+    """
     settings, repo = _context(project_id)
     _require_project(repo)
     if repo.get_paper(paper_id) is None:
         _fail(f"{paper_id} absent du corpus de {project_id}")
     try:
-        pages, _ = read_pages(repo.db, settings.papers_dir, paper_id)
+        text_pages, digest = read_pages(repo.db, settings.papers_dir, paper_id)
     except (FileNotFoundError, FulltextTampered) as exc:
         _fail(str(exc))
-    if page is not None and not 1 <= page <= len(pages):
-        _fail(f"{paper_id} a {len(pages)} pages")
-    for number, text in enumerate(pages, start=1):
-        if page is None or number == page:
-            typer.echo(f"===== {paper_id} — page {number}/{len(pages)} =====\n{text}\n")
+    if page is not None and pages is not None:
+        _fail("--page et --pages sont exclusifs")
+    read = repo.pages_read(paper_id, digest)
+
+    if page is None and pages is None:
+        rows = outline(text_pages, read)
+        summary = coverage(paper_id, text_pages, read).summary()
+        if as_json:
+            _print_json({"paper_id": paper_id, "summary": summary, "pages": rows})
+            return
+        typer.echo(f"{paper_id} : {len(text_pages)} pages ; {summary}")
+        for r in rows:
+            mark = "lue" if r["read"] else "   "
+            refs = " [réf.]" if r["references"] else ""
+            typer.echo(f"  p.{r['page']:<4} {r['chars']:>6} car.  {mark}{refs}  {r['first_line']}")
+        typer.echo(f"Lire : fulltext show {project_id} {paper_id} --pages N-M "
+                   f"(au plus {settings.sources.fulltext.max_show_chars} caractères par appel)")
+        return
+
+    try:
+        first, last = parse_page_range(pages if pages is not None else str(page), len(text_pages))
+    except ValueError as exc:
+        _fail(f"{paper_id} : {exc}")
+    shown = select_pages(text_pages, first, last, settings.sources.fulltext.max_show_chars)
+    repo.record_page_reads(paper_id, shown, digest)
+    for number in shown:
+        typer.echo(f"===== {paper_id} — page {number}/{len(text_pages)} =====\n{text_pages[number - 1]}\n")
+    if shown[-1] < last:
+        typer.echo(f"===== limite de {settings.sources.fulltext.max_show_chars} caractères atteinte : "
+                   f"pages {shown[-1] + 1}-{last} non affichées, relancer avec --pages {shown[-1] + 1}-{last} =====")
 
 
 # --- evidence ----------------------------------------------------------------
@@ -492,14 +536,21 @@ def evidence_withdraw(
 
 @review_app.command("check")
 def review_check(project_id: ProjectId, as_json: JsonFlag = False) -> None:
-    """Vérifie les citations de literature-review.md (PAPER-xxx et EV-xxx)."""
-    _, repo = _context(project_id)
+    """Vérifie les citations de literature-review.md (PAPER-xxx et EV-xxx) et la lecture des textes intégraux."""
+    settings, repo = _context(project_id)
     _require_project(repo)
     path = repo.dir / "literature-review.md"
     text = path.read_text(encoding="utf-8") if path.exists() else None
     result = check_literature_review(text, repo.load_papers(), repo.load_evidence())
+    try:
+        coverages = repo.reading_coverage()
+    except FulltextTampered as exc:
+        _fail(str(exc))
+    if settings.policy.require_full_reading:
+        result.errors.extend(check_reading(coverages.values(), project_id))
     if as_json:
         _print_json({"errors": result.errors, "warnings": result.warnings,
+                     "fully_read": sorted(pid for pid, c in coverages.items() if c.complete),
                      "cited_papers": result.cited_papers, "cited_evidence": result.cited_evidence})
     else:
         status = "BLOCKED" if result.errors else "OK"

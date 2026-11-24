@@ -42,8 +42,13 @@ def strength_ceiling(supporting: list[Evidence]) -> EvidenceStrength:
 
 
 def useful_searches(searches: list[SearchExecution]) -> list[SearchExecution]:
-    """Recherches contradictoires dont les résultats ont été fusionnés dans le corpus."""
-    return [s for s in searches if s.status != SearchStatus.FAILED]
+    """Recherches contradictoires abouties qui ont ramené au moins un résultat.
+
+    Une recherche sans aucun résultat ne prouve pas l'absence de travaux : le plus souvent, la requête est trop
+    étroite (arXiv exige tous les termes ; 10 des 16 recherches contradictoires du projet
+    decentralized-ai-governance ne ramenaient rien). Elle ne compte donc pas comme recherche contradictoire.
+    """
+    return [s for s in searches if s.status != SearchStatus.FAILED and any(r.hits for r in s.results)]
 
 
 def check_gap(
@@ -77,13 +82,13 @@ def check_gap(
                 f"minimum {min_supporting_papers} ; rester candidate"
             )
         if not searched:
-            errors.append("statut supported : aucune recherche contradictoire (`watch search --for-gap`)")
+            errors.append("statut supported : aucune recherche contradictoire ayant ramené des résultats (`watch search --for-gap`, requête moins étroite)")
     if draft.status == GapStatus.RESOLVED and not contradicting:
         errors.append("statut resolved : citer les preuves des travaux qui comblent le gap (contradicting_evidence)")
 
     if draft.novelty_assessment == NoveltyAssessment.NOT_FOUND_IN_SEARCHES:
         if not searched:
-            errors.append("nouveauté not_found_in_searches : aucune recherche contradictoire effectuée")
+            errors.append("nouveauté not_found_in_searches : aucune recherche contradictoire ayant ramené des résultats")
         if contradicting:
             errors.append("nouveauté not_found_in_searches incompatible avec des preuves contraires : partially_addressed")
     if draft.novelty_assessment == NoveltyAssessment.PARTIALLY_ADDRESSED and not contradicting:
@@ -167,7 +172,7 @@ def check_gap_analysis(
         if not gap.active:
             continue
         if not useful_searches(searches):
-            check.warnings.append(f"{gap.gap_id} : aucune recherche contradictoire (Q3), nouveauté non vérifiée")
+            check.warnings.append(f"{gap.gap_id} : aucune recherche contradictoire ayant ramené des résultats (Q3), nouveauté non vérifiée")
         alignment = alignments.get(gap.gap_id)
         if alignment is None:
             check.errors.append(f"{gap.gap_id} : pas d'évaluation au regard des valeurs (`alignment set`)")

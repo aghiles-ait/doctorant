@@ -22,6 +22,7 @@ from research_lab.storage.repositories import (
     load_all_papers,
     load_fulltext,
     pages_path,
+    read_pages,
 )
 from research_lab.validation.evidence import find_quote_pages, match_key, quote_in
 from research_lab.validation.outputs import check_literature_review
@@ -97,14 +98,36 @@ def included(repo):
     return repo
 
 
-@pytest.fixture
-def with_fulltext(included, settings, fetcher):
+def _fetch(included, settings, fetcher):
     with respx.mock:
         respx.get(ARXIV_PDF).mock(return_value=httpx.Response(200, content=make_pdf([PAGE_1, PAGE_2])))
         respx.get("https://api.openalex.org/works/W1").mock(
             return_value=httpx.Response(200, json={"best_oa_location": None, "locations": []}))
         list(fetch_fulltexts(included, settings, fetcher))
     return included
+
+
+@pytest.fixture
+def fetched(included, settings, fetcher):
+    """Texte intégral téléchargé, aucune page encore affichée."""
+    return _fetch(included, settings, fetcher)
+
+
+def read_all(repo, settings):
+    """Simule `fulltext show` sur toutes les pages des textes disponibles."""
+    for paper in repo.load_papers():
+        record = load_fulltext(repo.db, paper.paper_id)
+        if record and record.status == FulltextStatus.AVAILABLE:
+            pages, digest = read_pages(repo.db, settings.papers_dir, paper.paper_id)
+            repo.record_page_reads(paper.paper_id, list(range(1, len(pages) + 1)), digest)
+
+
+@pytest.fixture
+def with_fulltext(included, settings, fetcher):
+    """Texte intégral téléchargé et entièrement lu."""
+    repo = _fetch(included, settings, fetcher)
+    read_all(repo, settings)
+    return repo
 
 
 def _evidence(repo, settings, **kwargs):

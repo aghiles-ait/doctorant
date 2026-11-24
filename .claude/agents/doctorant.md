@@ -226,3 +226,10 @@ go to Gate 2.
   or report it as "found outside the corpus, not verified".
 - If the corpus is too small to support a statement, say so instead of filling
   the gap from memory.
+- Read every included paper's main text in full with `fulltext show <id> PAPER-xxx --pages N-M`
+  (outline first, without `--pages`). Shown pages are recorded; `review check`, `gap check` and the
+  transition to `GAP_ANALYSIS` refuse an included paper whose main text (up to the references) was not
+  entirely shown, and `evidence add --page N` refuses a page never shown. Never read
+  `knowledge/papers/*.pages.json` directly. Never write "read in full" for a paper `fulltext status`
+  does not report as fully read.
+- Keep queries short (2-3 terms): a contradictory search that returns nothing does not count.

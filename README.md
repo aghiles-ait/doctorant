@@ -57,7 +57,8 @@ $L corpus decide decentralized-ai-governance PAPER-004 --exclude --reason "…"
 
 $L fulltext fetch decentralized-ai-governance      # PDF en accès libre des publications incluses
 $L fulltext status decentralized-ai-governance
-$L fulltext show decentralized-ai-governance PAPER-001 --page 3
+$L fulltext show decentralized-ai-governance PAPER-001            # plan : pages, taille, lues ou non
+$L fulltext show decentralized-ai-governance PAPER-001 --pages 3-6  # texte (15 000 caractères au plus par appel)
 
 $L evidence add decentralized-ai-governance --paper PAPER-001 --page 3 --type empirical_result \
    --claim "…" --quote "extrait exact du texte"   # refusé si l'extrait n'est pas à cette page
@@ -255,7 +256,9 @@ de tes données de recherche.
 **Sprint 1 — implémenté**
 - Projet persistant et transitions `NEW → SCOPING → LITERATURE_SEARCH` contrôlées par le code
   (`scope.md` obligatoire avant la recherche).
-- Connecteurs arXiv et OpenAlex : pagination, limites de débit, relances.
+- Connecteurs arXiv et OpenAlex : pagination, limites de débit, relances (15, 60 puis 180 s, ou
+  `Retry-After` plafonné à 300 s), filtres configurables (catégories arXiv ; discipline, résumé exigé
+  et types de publication sur OpenAlex).
 - Corpus par projet (`papers.json`) : identifiants `PAPER-xxx` stables, déduplication
   par DOI, arXiv ID, OpenAlex ID puis titre et année, provenance de chaque résultat.
 - Journal des recherches (`search-log.json`) : requête envoyée à chaque API, période,
@@ -275,6 +278,11 @@ de tes données de recherche.
 - Tri des publications (`included` / `excluded`) avec justification historisée.
 - Texte intégral : PDF arXiv puis versions libres d'OpenAlex, texte extrait page par page,
   stocké dans `knowledge/papers/` et protégé par son empreinte.
+- Lecture vérifiable : chaque page affichée par `fulltext show` est enregistrée ; le texte principal
+  (jusqu'aux références) de chaque publication incluse doit avoir été affiché en entier, et une preuve
+  ne cite qu'une page affichée (`fulltext status` donne la couverture).
+- Recherches plafonnées signalées par `corpus check` (à compléter jusqu'à 300 résultats annoncés) ;
+  une recherche contradictoire sans résultat ne compte pas.
 - Preuves `EV-xxx` vérifiées contre le texte, immuables, retirables avec une raison ;
   matrice de preuves `evidence-matrix.json`.
 - Contrôle des citations de `literature-review.md` et transitions `LITERATURE_REVIEW` /

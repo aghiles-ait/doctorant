@@ -29,6 +29,7 @@ from research_lab.schemas.question import QuestionDraft, ResearchQuestion
 from research_lab.schemas.solution import Comparison, Solution, SolutionDraft
 from research_lab.schemas.search import SearchExecution
 from research_lab.storage.database import Database
+from research_lab.reading import Coverage, check_reading, coverage
 from research_lab.validation.outputs import check_literature_review
 from research_lab.validation.questions import check_problem_formulation
 from research_lab.validation.critique import unanswered_objections
@@ -262,10 +263,12 @@ def read_pages(db: Database, papers_dir: Path, paper_id: str) -> tuple[list[str]
 
 
 class ProjectRepository:
-    def __init__(self, db: Database, projects_dir: Path, project_id: str) -> None:
+    def __init__(self, db: Database, projects_dir: Path, project_id: str, papers_dir: Path | None = None) -> None:
         self.db = db
         self.project_id = project_id
         self.dir = projects_dir / project_id
+        # Même disposition que Settings : <racine>/research/projects et <racine>/knowledge/papers.
+        self.papers_dir = papers_dir or projects_dir.parent.parent / "knowledge" / "papers"
 
     @property
     def project_file(self) -> Path:
@@ -345,12 +348,16 @@ class ProjectRepository:
         review_text = review_file.read_text(encoding="utf-8") if review_file.exists() else None
         return ProjectFacts(
             project_dir=self.dir,
-            corpus_status=check_corpus(papers, self.load_search_log(), policy.min_corpus_size).status,
+            corpus_status=check_corpus(
+                papers, self.load_search_log(), policy.min_corpus_size, policy.max_examinable_results
+            ).status,
             candidate_count=sum(p.status == PaperStatus.CANDIDATE for p in papers),
             included_count=len(included),
             without_fulltext_attempt=[p.paper_id for p in included if p.paper_id not in attempted],
             active_evidence_count=sum(e.active for e in evidence),
             review_errors=check_literature_review(review_text, papers, evidence).errors,
+            unread_fulltexts=check_reading(self.reading_coverage().values(), self.project_id)
+            if policy.require_full_reading else [],
             question_errors=check_problem_formulation(questions, self.approved_gaps(), evidence).errors,
             solution_errors=check_solution_design(
                 questions, self.load_solutions(), self.load_comparisons(), evidence, policy.min_solution_alternatives
@@ -486,6 +493,41 @@ class ProjectRepository:
         self.export()
 
     # --- Gaps -------------------------------------------------------------------------
+
+    # --- Lecture du texte intégral ---------------------------------------------------------
+
+    def record_page_reads(self, paper_id: str, pages: list[int], text_sha256: str) -> None:
+        """Enregistre les pages affichées par `fulltext show` (la première date d'affichage est conservée)."""
+        at = now().isoformat()
+        with self.db.transaction() as conn:
+            conn.executemany(
+                "INSERT OR IGNORE INTO page_reads (project_id, paper_id, page, text_sha256, first_shown_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                [(self.project_id, paper_id, page, text_sha256, at) for page in pages],
+            )
+
+    def pages_read(self, paper_id: str, text_sha256: str) -> set[int]:
+        rows = self.db.conn.execute(
+            "SELECT page FROM page_reads WHERE project_id = ? AND paper_id = ? AND text_sha256 = ?",
+            (self.project_id, paper_id, text_sha256),
+        )
+        return {r["page"] for r in rows}
+
+    def paper_coverage(self, paper_id: str) -> Coverage | None:
+        """Couverture de lecture d'une publication, ou None sans texte intégral disponible."""
+        record = load_fulltext(self.db, paper_id)
+        if record is None or record.status != FulltextStatus.AVAILABLE:
+            return None
+        pages, digest = read_pages(self.db, self.papers_dir, paper_id)
+        return coverage(paper_id, pages, self.pages_read(paper_id, digest))
+
+    def reading_coverage(self) -> dict[str, Coverage]:
+        """Couverture de lecture des publications incluses dont le texte intégral est disponible."""
+        result = {}
+        for paper in self.load_papers():
+            if paper.status == PaperStatus.INCLUDED and (c := self.paper_coverage(paper.paper_id)) is not None:
+                result[paper.paper_id] = c
+        return result
 
     def _gap_versions(self, where: str, params: tuple) -> list[Gap]:
         rows = self.db.conn.execute(
@@ -874,11 +916,13 @@ class ProjectRepository:
             if paper.status != PaperStatus.INCLUDED:
                 continue
             fulltext = load_fulltext(self.db, paper.paper_id)
+            reading = self.paper_coverage(paper.paper_id)
             matrix.append({
                 "paper_id": paper.paper_id,
                 "title": paper.title,
                 "year": paper.published.year if paper.published else None,
                 "fulltext_status": fulltext.status if fulltext else None,
+                "reading": reading.as_dict() if reading else None,
                 "evidence": [
                     e.model_dump(mode="json", include={"evidence_id", "evidence_type", "claim", "quote", "location", "page"})
                     for e in evidence if e.paper_id == paper.paper_id

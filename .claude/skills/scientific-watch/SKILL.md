@@ -21,14 +21,22 @@ les identifiants stables, la déduplication et la provenance.
 1. **Vérifier l'état** : `.venv/bin/research-lab project status <id> --json`. Si l'état n'est pas
    `LITERATURE_SEARCH`, s'arrêter et le signaler.
 2. **Lire `scope.md`** et en dériver un plan de requêtes : 3 à 6 requêtes couvrant le sujet principal,
-   ses synonymes et les termes des approches concurrentes. Une requête = quelques mots-clés ;
-   `"expression exacte"` entre guillemets. Toutes les requêtes utilisent la même période.
+   ses synonymes et les termes des approches concurrentes. Une requête = **2 ou 3 mots-clés**, au plus une
+   `"expression exacte"` entre guillemets : arXiv exige tous les termes, et une requête trop précise ne ramène
+   rien (10 des 16 recherches contradictoires du premier projet). Toutes les requêtes utilisent la même période.
+   Les filtres de `config/academic-sources.yaml` s'appliquent d'eux-mêmes : catégories informatiques sur arXiv ;
+   sur OpenAlex, informatique seulement, résumé exigé, articles, prépublications, communications, synthèses
+   et chapitres. Ne pas chercher à les contourner.
 3. **Exécuter chaque requête** :
    ```
    .venv/bin/research-lab watch search <id> --query '<mots-clés>' --from AAAA-MM-JJ --to AAAA-MM-JJ --json
    ```
    Options : `--sources arxiv,openalex`, `--max-results N` (par source).
-4. **Contrôler le corpus** : `.venv/bin/research-lab corpus check <id> --json`.
+4. **Contrôler le corpus** : `.venv/bin/research-lab corpus check <id> --json`. Une recherche est
+   plafonnée quand une source annonce plus de résultats (`total_available`) que ceux examinés :
+   - jusqu'à 300 résultats annoncés, `corpus check` renvoie `NEEDS_MORE_RESEARCH` : relancer **la même**
+     requête (même texte, même période) avec le `--max-results` indiqué ;
+   - au-delà, la requête est trop large : l'affiner (avertissement), et signaler le plafond dans les limites.
 5. **Inspecter** si nécessaire : `corpus list <id>`, `corpus show <id> PAPER-xxx`, `search-log <id>`.
 
 ## Output
@@ -54,7 +62,7 @@ Compte rendu à l'agent appelant :
 
 | Situation | Code CLI | Comportement |
 |---|---|---|
-| Une source ne répond pas | `watch search` sort avec le code 2, statut `failed`, corpus inchangé | Relancer une fois la même requête. Si l'échec persiste : statut `BLOCKED`, citer l'erreur du journal. Ne pas utiliser `--allow-partial` sauf instruction humaine explicite. |
+| Une source ne répond pas | `watch search` sort avec le code 2, statut `failed`, corpus inchangé | La CLI a déjà réessayé (15, 60 puis 180 s, ou le délai `Retry-After`) : l'erreur liste chaque tentative. Relancer une fois la même requête, pas davantage (arXiv renvoie des 429 quand on insiste). Si l'échec persiste : statut `BLOCKED`, citer l'erreur du journal. Ne pas utiliser `--allow-partial` sauf instruction humaine explicite. |
 | Corpus sous le seuil de la politique | `corpus check` → `NEEDS_MORE_RESEARCH` | Élargir les requêtes ou la période, puis recontrôler. Si le sujet reste peu couvert, le rapporter tel quel : c'est une information, pas un échec à masquer. |
 | Incohérence du corpus | `corpus check` sort avec le code 2 → `BLOCKED` | S'arrêter et rapporter les erreurs. Ne pas corriger les fichiers à la main. |
 | Projet pas à l'état `LITERATURE_SEARCH` | code 1 | S'arrêter ; le périmètre doit d'abord être défini. |

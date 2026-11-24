@@ -29,6 +29,8 @@ class ProjectFacts:
     without_fulltext_attempt: list[str]
     active_evidence_count: int
     review_errors: list[str]  # contrôle des citations de literature-review.md
+    # Publications incluses dont le texte principal n'a pas été affiché en entier (policy require_full_reading).
+    unread_fulltexts: list[str]
     question_errors: list[str]  # contrôle des questions de recherche (research-lab question check)
     solution_errors: list[str]  # contrôle des solutions et de leur comparaison (research-lab solution check)
     review_rounds: int  # passages à SCIENTIFIC_REVIEW depuis la dernière révision demandée à la Gate 2
@@ -61,6 +63,7 @@ def _review_complete(facts: ProjectFacts) -> str | None:
     if not facts.active_evidence_count:
         problems.append("aucune preuve enregistrée")
     problems.extend(f"literature-review.md : {e}" for e in facts.review_errors)
+    problems.extend(f"lecture incomplète : {e}" for e in facts.unread_fulltexts)
     return " ; ".join(problems) or None
 
 

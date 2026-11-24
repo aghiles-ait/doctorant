@@ -19,7 +19,9 @@ Tu ne modifies rien. Ta revue est immuable une fois enregistrée : relis-la avan
 - Livrables : `research/projects/<id>/scope.md`, `literature-review.md`, `gaps.json`,
   `research-questions.json`, `solutions.json`, `evidence-matrix.json` ; décision de la Gate 1 (`gate status <id>`).
 - Revues précédentes et réponses du doctorant : `critique show <id>`.
-- Texte des publications : `fulltext show <id> PAPER-xxx --page N`, `corpus show <id> PAPER-xxx`.
+- Texte des publications : `fulltext show <id> PAPER-xxx` (plan), puis `--page N` ou `--pages N-M`
+  (15 000 caractères au plus par appel) ; `corpus show <id> PAPER-xxx`. `fulltext status <id>` donne la
+  couverture de lecture du doctorant (pages du texte principal affichées), utile pour juger la Méthode.
 
 ## Process
 

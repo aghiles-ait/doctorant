@@ -19,15 +19,18 @@ _NS = {
 }
 
 
-def build_search_query(query: SearchQuery) -> str:
+def build_search_query(query: SearchQuery, categories: list[str] | tuple[str, ...] = ()) -> str:
     """Traduit une requête par mots-clés en syntaxe arXiv.
 
-    Chaque mot (ou "expression entre guillemets") devient un terme `all:` combiné par AND.
+    Chaque mot (ou "expression entre guillemets") devient un terme `all:` combiné par AND ; tous les
+    termes sont exigés, d'où l'intérêt de requêtes courtes. `categories` restreint aux catégories données.
     """
     terms = []
     for token in shlex.split(query.text):
         terms.append(f'all:"{token}"' if " " in token else f"all:{token}")
     search = " AND ".join(terms)
+    if categories:
+        search = f"({search}) AND ({' OR '.join(f'cat:{c}' for c in categories)})"
     if query.date_from or query.date_to:
         start = (query.date_from or date(1991, 1, 1)).strftime("%Y%m%d") + "0000"
         end = (query.date_to or date.today()).strftime("%Y%m%d") + "2359"
@@ -92,7 +95,7 @@ class ArxivProvider:
         self._http = HttpClient(config, retry, sleep=sleep)
 
     def search(self, query: SearchQuery) -> ProviderResult:
-        search_query = build_search_query(query)
+        search_query = build_search_query(query, self._config.categories)
         hits: list[SourceHit] = []
         warnings: list[str] = []
         total: int | None = None

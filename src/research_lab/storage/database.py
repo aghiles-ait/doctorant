@@ -400,6 +400,17 @@ _MIGRATIONS: list[str] = [
     """
     ALTER TABLE state_changes ADD COLUMN forced INTEGER NOT NULL DEFAULT 0;
     """,
+    # 9 — pages du texte intégral affichées par `fulltext show`, par projet (couverture de lecture)
+    """
+    CREATE TABLE page_reads (
+        project_id     TEXT NOT NULL REFERENCES projects(project_id),
+        paper_id       TEXT NOT NULL REFERENCES papers(paper_id),
+        page           INTEGER NOT NULL CHECK (page >= 1),
+        text_sha256    TEXT NOT NULL,  -- texte affiché : une nouvelle extraction repart de zéro
+        first_shown_at TEXT NOT NULL,
+        PRIMARY KEY (project_id, paper_id, page, text_sha256)
+    );
+    """,
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)

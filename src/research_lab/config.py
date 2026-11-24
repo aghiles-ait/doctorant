@@ -15,8 +15,18 @@ _MARKER = Path("config") / "academic-sources.yaml"
 
 
 class RetryConfig(BaseModel):
-    max_attempts: int = Field(default=3, ge=1)
-    backoff_seconds: float = Field(default=2.0, ge=0)
+    # arXiv renvoie des 429 même à 3 s d'écart entre requêtes : des attentes de quelques secondes ne suffisent pas.
+    max_attempts: int = Field(default=4, ge=1)
+    # Attente avant la 2e, 3e, … tentative ; la dernière valeur sert pour les suivantes.
+    delays_seconds: list[float] = Field(default=[15.0, 60.0, 180.0], min_length=1)
+    # `Retry-After` envoyé par le serveur est respecté, dans cette limite.
+    max_retry_after_seconds: float = Field(default=300.0, ge=0)
+
+    def delay(self, attempt: int, retry_after: float | None = None) -> float:
+        """Attente après l'échec de la tentative `attempt` (1 pour la première)."""
+        if retry_after is not None:
+            return min(retry_after, self.max_retry_after_seconds)
+        return self.delays_seconds[min(attempt, len(self.delays_seconds)) - 1]
 
 
 class ProviderConfig(BaseModel):
@@ -25,6 +35,10 @@ class ProviderConfig(BaseModel):
     page_size: int = Field(default=100, ge=1)
     timeout_seconds: float = 30.0
     min_interval_seconds: float = 0.0
+    # arXiv : catégories auxquelles la recherche est restreinte (vide : toutes).
+    categories: list[str] = []
+    # OpenAlex : filtres ajoutés à chaque recherche (syntaxe `filter=` de l'API, par exemple `has_abstract:true`).
+    filters: list[str] = []
 
 
 class FulltextConfig(BaseModel):
@@ -34,6 +48,9 @@ class FulltextConfig(BaseModel):
     max_pdf_mb: float = Field(default=50.0, gt=0)
     # En dessous, le PDF est probablement scanné : pas de texte exploitable.
     min_extracted_chars: int = Field(default=500, ge=0)
+    # `fulltext show` n'affiche pas plus que ce nombre de caractères par appel : une sortie trop longue
+    # peut être tronquée avant d'atteindre le modèle (vécu avec l'agent researcher, 66 727 caractères).
+    max_show_chars: int = Field(default=15000, ge=1000)
 
 
 class SourcesConfig(BaseModel):
@@ -50,6 +67,12 @@ class PolicyConfig(BaseModel):
     min_corpus_size: int = Field(ge=0)
     allow_partial_search: bool = False
     min_quote_chars: int = Field(default=20, ge=1)
+    # Une publication incluse dont le texte intégral est disponible doit avoir été affichée en entier
+    # (pages du texte principal, jusqu'aux références) avant de clore l'état de l'art.
+    require_full_reading: bool = True
+    # Recherche plafonnée : en dessous de ce nombre de résultats disponibles, `corpus check` exige de tout
+    # examiner (relancer avec --max-results) ; au-dessus, la requête est trop large et le plafond est signalé.
+    max_examinable_results: int = Field(default=300, ge=1)
     # Nombre minimal de publications distinctes appuyant un gap pour le déclarer `supported`.
     min_supporting_papers: int = Field(default=2, ge=1)
     # Nombre minimal de solutions actives, comparées entre elles, pour chaque question de recherche.

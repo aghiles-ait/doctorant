@@ -4,9 +4,12 @@ version: "1.0"
 default_sources: [arxiv, openalex]
 default_max_results: 50  # par source
 
+# Délais d'attente (HTTP 429, 500, 502, 503, 504, délais et erreurs de connexion). arXiv renvoie des 429
+# même avec 3 s entre requêtes (vécu avec l'agent researcher le 2026-11-23) : quelques secondes ne suffisent pas.
 retry:
-  max_attempts: 3
-  backoff_seconds: 2  # doublé à chaque tentative
+  max_attempts: 4                 # 1 essai + 3 nouvelles tentatives
+  delays_seconds: [15, 60, 180]   # attente avant chaque nouvelle tentative
+  max_retry_after_seconds: 300    # `Retry-After` du serveur respecté, dans cette limite
 
 providers:
   arxiv:
@@ -16,6 +19,9 @@ providers:
     timeout_seconds: 30
     # arXiv demande au moins 3 secondes entre deux requêtes.
     min_interval_seconds: 3
+    # Recherche limitée à ces catégories : sans elles, `DAO` ou `governance` ramènent d'autres disciplines.
+    # Même liste que la veille de l'agent researcher, plus cs.CL (LLM).
+    categories: [cs.AI, cs.MA, cs.CR, cs.CY, cs.DC, cs.GT, cs.LG, cs.NI, cs.CL]
 
   openalex:
     enabled: true
@@ -23,6 +29,15 @@ providers:
     page_size: 100
     timeout_seconds: 30
     min_interval_seconds: 0.2
+    # Filtres ajoutés à chaque recherche (vérifiés sur l'API le 2026-11-24 ; https://docs.openalex.org) :
+    # - informatique seulement (domaine 17 de la classification OpenAlex) : pas de science politique,
+    #   de droit ni de gestion (`DAO "artificial intelligence"` : 422 résultats sans filtres, 107 avec) ;
+    # - un résumé est exigé (27 publications sans résumé avaient dû être exclues) ;
+    # - articles, prépublications, communications, synthèses et chapitres (les actes LNCS sont des chapitres).
+    filters:
+      - "primary_topic.field.id:17"
+      - "has_abstract:true"
+      - "type:article|preprint|conference-paper|review|book-chapter"
     # Authentification : variables OPENALEX_API_KEY et OPENALEX_MAILTO (voir .env.example).
 
 # Semantic Scholar et Crossref : connecteurs prévus dans un sprint ultérieur.
@@ -35,3 +50,6 @@ fulltext:
   min_interval_seconds: 3
   max_pdf_mb: 50
   min_extracted_chars: 500
+  # `fulltext show` affiche au plus ce nombre de caractères par appel (une sortie trop longue peut être
+  # tronquée avant d'atteindre le modèle).
+  max_show_chars: 15000

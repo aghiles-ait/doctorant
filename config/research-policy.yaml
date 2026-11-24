@@ -6,11 +6,17 @@ literature_search:
   min_corpus_size: 20
   # Autorise l'option --allow-partial (fusion des résultats quand une source échoue).
   allow_partial_search: false
+  # Recherche plafonnée par --max-results : jusqu'à ce nombre de résultats disponibles, `corpus check` exige de
+  # les examiner tous (NEEDS_MORE_RESEARCH) ; au-delà, la requête est trop large : avertissement, à affiner.
+  max_examinable_results: 300
 
 literature_review:
   # Longueur minimale d'un extrait cité comme preuve (lettres et chiffres, hors espaces et ponctuation).
   # Un extrait trop court pourrait être retrouvé par hasard dans le texte.
   min_quote_chars: 20
+  # Une publication incluse dont le texte intégral est disponible doit avoir été affichée par
+  # `fulltext show` sur tout son texte principal (jusqu'aux références) avant de clore l'état de l'art.
+  require_full_reading: true
 
 gap_analysis:
   # Un gap ne passe au statut `supported` qu'appuyé par des preuves d'au moins ce nombre de

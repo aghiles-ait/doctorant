@@ -44,6 +44,12 @@ Python ≥ 3.12, environnement dans `.venv/` (voir README.md pour l'installation
   `research-values.yaml` servent seulement à évaluer et prioriser les gaps, jamais à en créer.
 - `validation/evidence.py` : vérifie qu'un extrait cité figure dans le texte (comparaison sur
   lettres et chiffres seulement, pour tolérer les artefacts d'extraction PDF).
+- `reading.py` : couverture de lecture. `fulltext show` affiche un plan, ou des pages (≤ `max_show_chars`
+  par appel) qu'il enregistre dans `page_reads` (migration 9) ; le texte principal (jusqu'aux références)
+  de chaque incluse doit être affiché en entier (`require_full_reading`), et `evidence add --page N`
+  exige que la page l'ait été. Leçons de l'agent researcher d'iexec-openclaw (2026-11-23/24), comme les
+  relances longues (`retry.delays_seconds`), les filtres de sources (`categories`, `filters`), les
+  recherches plafonnées (`max_examinable_results`) et les recherches contradictoires vides qui ne comptent pas.
 - `knowledge/papers/` : PDF et texte extrait page par page (`PAPER-xxx.pages.json`), partagés
   entre projets, non versionnés ; l'empreinte du texte est contrôlée à chaque lecture.
 - `knowledge/research.db` : **source de vérité**, partagée entre projets. Les identifiants
