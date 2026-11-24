@@ -6,6 +6,7 @@ import json
 import shutil
 import sqlite3
 import sys
+import webbrowser
 from datetime import date
 from pathlib import Path
 from typing import Annotated
@@ -1386,6 +1387,32 @@ def costs_report(
     _cost_lines("Par modèle", report.by_model)
     if report.unpriced_models:
         typer.echo(f"Modèles sans prix (config/costs.yaml) : {', '.join(report.unpriced_models)}")
+
+
+# --- serve -------------------------------------------------------------------
+
+
+@app.command("serve")
+def serve(
+    port: Annotated[int, typer.Option(help="Port d'écoute (127.0.0.1 seulement)")] = 8765,
+    open_page: Annotated[bool, typer.Option("--open", help="Ouvrir l'interface dans le navigateur")] = False,
+) -> None:
+    """Interface web : projets, diagramme d'état, livrables de chaque état, qualité et coûts (lecture seule)."""
+    import uvicorn
+
+    from research_lab.api import create_app
+
+    settings, db = _settings_and_db()
+    sync(db, settings)  # coûts à jour
+    db.conn.close()
+    dist = settings.root / "web" / "dist"
+    if not (dist / "index.html").is_file():
+        typer.echo(f"Interface non compilée ({dist}) : cd web && npm install && npm run build. API seule disponible.")
+    url = f"http://127.0.0.1:{port}/"
+    typer.echo(f"Interface : {url}  (API : {url}api/docs ; Ctrl+C pour arrêter)")
+    if open_page:
+        webbrowser.open(url)
+    uvicorn.run(create_app(settings.root, dist), host="127.0.0.1", port=port, log_level="warning")
 
 
 # --- db ----------------------------------------------------------------------

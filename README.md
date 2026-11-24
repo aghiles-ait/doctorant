@@ -5,12 +5,20 @@ Spécification : [specs.md](specs.md).
 Procédures d'exploitation (suivre un projet, décisions humaines, déblocage, sauvegarde, coûts) :
 [docs/exploitation.md](docs/exploitation.md).
 
+**Pour s'y retrouver** : `.venv/bin/research-lab serve --open` lance l'interface web sur
+http://127.0.0.1:8765 : tous les projets, diagramme d'état, livrables de chaque état, prochaine étape, qualité,
+coûts. Les données sont lues dans la base à l'ouverture : recharger la page pour actualiser. Lecture seule : les
+décisions humaines restent dans le terminal.
+
 ## Installation
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
 cp .env.example .env   # facultatif : clé API OpenAlex
+
+# Interface web (React, Node.js ≥ 18) : à compiler une fois, puis après chaque modification de web/
+cd web && npm install && npm run build && cd ..
 ```
 
 Les variables `OPENALEX_API_KEY` et `OPENALEX_MAILTO` sont lues dans l'environnement du

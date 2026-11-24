@@ -442,3 +442,4 @@ def test_backup_copies_database_fulltexts_and_projects(project_ready, apis, lab_
     assert copy.conn.execute("SELECT COUNT(*) FROM papers").fetchone()[0] > 0
     assert (target / "research" / "projects" / PROJECT / "scope.md").exists()
     assert invoke("db", "backup", str(target)).exit_code == 1  # jamais par-dessus une sauvegarde
+

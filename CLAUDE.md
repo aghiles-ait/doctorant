@@ -37,7 +37,7 @@ Python ≥ 3.12, environnement dans `.venv/` (voir README.md pour l'installation
   `workflow/` (états, transitions et leurs préconditions sur `ProjectFacts` ; `approvals.py` :
   soumission et décision des gates), `corpus.py`,
   `watch.py` (recherche), `fulltext.py` (PDF en accès libre), `review.py` (tri, preuves),
-  `gaps.py` (gaps, alignement), `resume.py` (reprise : `project resume`), `evaluation.py` (indicateurs `eval report`, notation humaine `eval rate`), `costs.py` (coûts lus dans les transcriptions de Claude Code, `costs report` ; prix dans `config/costs.yaml`), `questions.py` (questions et hypothèses), `solutions.py` (solutions et comparaisons), `critique.py` (revue critique, réponses), `proposal.py` et `bibliography.py` (Proposal,
+  `gaps.py` (gaps, alignement), `resume.py` (reprise : `project resume`), `evaluation.py` (indicateurs `eval report`, notation humaine `eval rate`), `costs.py` (coûts lus dans les transcriptions de Claude Code, `costs report` ; prix dans `config/costs.yaml`), `views.py` et `api.py` (API FastAPI en lecture seule pour l'interface web, `research-lab serve`), `questions.py` (questions et hypothèses), `solutions.py` (solutions et comparaisons), `critique.py` (revue critique, réponses), `proposal.py` et `bibliography.py` (Proposal,
   `references.bib`), `cli.py`. `templates/research-proposal.md` : sections contrôlées par `proposal check`.
 - `validation/gaps.py` : règles déterministes des gaps (force des preuves, statut `supported`,
   nouveauté) et de l'évaluation au regard des valeurs, calcul des scores de priorité.
@@ -62,6 +62,9 @@ Python ≥ 3.12, environnement dans `.venv/` (voir README.md pour l'installation
   `alignment.json`, `gate-1.json`, `gate-2.json`, `research-questions.json`, `solutions.json` et `scientific-review.json` sont **régénérés depuis la base**
   après chaque écriture. `drafts/` contient les brouillons JSON écrits par l'agent pour
   `gap add/revise`, `alignment set`, `question add/revise` et `solution add/revise/compare`.
+- `web/` : interface React (Vite, TypeScript), compilée dans `web/dist` (non versionné) et servie par
+  `research-lab serve` ; `npm run dev` pour la développer (API sur le port 8765). Elle ne fait que lire :
+  aucune décision humaine ni écriture dans la base ne passe par l'interface.
 - `tests/unit`, `tests/integration` ; `tests/fixtures` contient des réponses réelles des APIs.
   `tests/regression` : références `golden/` du scénario complet et instantanés `fixtures/snapshot-vN/`
   d'anciennes versions. Ne jamais modifier un instantané ; après un changement voulu des exports,
