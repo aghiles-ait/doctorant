@@ -411,6 +411,20 @@ _MIGRATIONS: list[str] = [
         PRIMARY KEY (project_id, paper_id, page, text_sha256)
     );
     """,
+    # 10 — évaluation humaine des gaps et des hypothèses (sprint 4)
+    """
+    CREATE TABLE rating_sessions (
+        session_id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(project_id),
+        rater      TEXT NOT NULL,
+        at         TEXT NOT NULL,
+        record     TEXT NOT NULL  -- RatingSession complète, JSON
+    );
+    CREATE TRIGGER rating_sessions_append_only BEFORE UPDATE ON rating_sessions
+    BEGIN SELECT RAISE(ABORT, 'une évaluation humaine est immuable'); END;
+    CREATE TRIGGER rating_sessions_no_delete BEFORE DELETE ON rating_sessions
+    BEGIN SELECT RAISE(ABORT, 'une évaluation humaine est immuable'); END;
+    """,
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)

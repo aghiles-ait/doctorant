@@ -403,3 +403,30 @@ def test_corpus_list_and_show(project_ready, apis):
     shown = json.loads(invoke("corpus", "show", PROJECT, "PAPER-001").output)
     assert shown["paper_id"] == "PAPER-001"
     assert invoke("corpus", "show", PROJECT, "PAPER-999").exit_code == 1
+
+
+def test_evaluation_flow(project_ready, apis, lab_root, tmp_path, monkeypatch):
+    """Sprint 4 : indicateurs, notation humaine interactive, synthèse tous projets."""
+    from research_lab import cli
+    real_check = cli.human_check_failure
+    test_problem_formulation_flow(project_ready, apis, lab_root, tmp_path, monkeypatch)  # GAP-001, RQ-001/H1
+
+    report = invoke("eval", "report", PROJECT)
+    assert report.exit_code == 0 and "hypothèses avec critère de réfutation : 1/1" in report.output
+    assert "0/2 gaps et hypothèses notés" in report.output
+
+    monkeypatch.setattr(cli, "human_check_failure", real_check)
+    refused = invoke("eval", "rate", PROJECT)
+    assert refused.exit_code == 1 and "Évaluation refusée" in refused.output  # pas de terminal
+    monkeypatch.setattr(cli, "human_check_failure", lambda: None)
+
+    # GAP-001 : 3 critères et un commentaire (une note hors échelle redemandée) ; H1 passée.
+    rated = runner.invoke(app, ["eval", "rate", PROJECT], input="4\n9\n3\n5\nManque réel\n\nRAS\n")
+    assert rated.exit_code == 0, rated.output
+    assert "EVAL-001 : 1 notes enregistrées" in rated.output
+    [session] = json.loads((project_ready / "human-evaluation.json").read_text())
+    assert session["ratings"][0]["scores"] == {"reality": 4, "evidence": 3, "importance": 5}
+    assert "1/2 gaps et hypothèses notés" in invoke("eval", "report", PROJECT).output
+
+    summary = json.loads(invoke("eval", "summary", "--json").output)
+    assert (list(summary["rated_projects"]), summary["target_met"]) == ([PROJECT], False)

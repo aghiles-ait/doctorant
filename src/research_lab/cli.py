@@ -14,7 +14,16 @@ from pydantic import BaseModel, ValidationError
 from research_lab.config import Settings, load_settings
 from research_lab.corpus import CorpusStatus, check_corpus
 from research_lab.critique import CritiqueError, check_critique, respond, submit_review
+from research_lab.evaluation import (
+    EvaluationError,
+    current_ratings,
+    evaluation_summary,
+    quality_report,
+    rating_targets,
+    record_ratings,
+)
 from research_lab.fulltext import FulltextFetcher
+from research_lab.schemas.evaluation import Rating
 from research_lab.gaps import GapError, add_gap, check_gaps, revise_gap, set_alignment
 from research_lab.schemas.gap import AlignmentDraft, GapDraft
 from research_lab.proposal import ProposalError, check_proposal_file, write_references
@@ -83,6 +92,10 @@ proposal_app = typer.Typer(
 gate_app = typer.Typer(
     help="Validations humaines : Gate 1 (gaps retenus), Gate 2 (Research Proposal).", no_args_is_help=True
 )
+eval_app = typer.Typer(
+    help="Évaluation de la qualité scientifique : indicateurs Q1 à Q5, notation humaine des gaps et hypothèses.",
+    no_args_is_help=True,
+)
 app.add_typer(project_app, name="project")
 app.add_typer(watch_app, name="watch")
 app.add_typer(corpus_app, name="corpus")
@@ -96,6 +109,7 @@ app.add_typer(question_app, name="question")
 app.add_typer(solution_app, name="solution")
 app.add_typer(critique_app, name="critique")
 app.add_typer(proposal_app, name="proposal")
+app.add_typer(eval_app, name="eval")
 app.add_typer(db_app, name="db")
 
 ProjectId = Annotated[str, typer.Argument(help="Identifiant du projet (ex. decentralized-ai-governance)")]
@@ -1239,6 +1253,84 @@ def proposal_check(project_id: ProjectId, as_json: JsonFlag = False) -> None:
             typer.echo(f"  avertissement : {w}")
     if result.status == "BLOCKED":
         raise typer.Exit(2)
+
+
+# --- eval --------------------------------------------------------------------
+
+
+@eval_app.command("report")
+def eval_report(project_id: ProjectId, as_json: JsonFlag = False) -> None:
+    """Indicateurs calculés par le code (Q1 à Q5, revue, workflow). Ils ne jugent pas la valeur scientifique."""
+    settings, repo = _context(project_id)
+    _require_project(repo)
+    report = quality_report(repo, settings)
+    ratings = current_ratings(repo.load_rating_sessions())
+    if as_json:
+        _print_json({**report.as_dict(), "human_ratings": {t: r.model_dump(mode="json") for t, r in ratings.items()}})
+        return
+    typer.echo(f"Projet : {report.project_id} ({report.state})")
+    for i in report.indicators:
+        mark = {True: "ok ", False: "KO ", None: "   "}[i.ok]
+        typer.echo(f"  {mark} {i.control:<8} {i.name} : {i.value}")
+    targets = rating_targets(repo)
+    typer.echo(f"Évaluation humaine : {sum(t.target in ratings for t in targets)}/{len(targets)} gaps et hypothèses notés"
+               + ("" if ratings else f" (`research-lab eval rate {project_id}`, dans ton terminal)"))
+
+
+@eval_app.command("rate")
+def eval_rate(project_id: ProjectId) -> None:
+    """Notation humaine des gaps et des hypothèses, critère par critère (terminal interactif, jamais par un agent)."""
+    settings, repo = _context(project_id)
+    _require_project(repo)
+    if reason := human_check_failure():
+        _fail(f"Évaluation refusée : {reason}")
+    config = settings.policy.evaluation
+    targets = rating_targets(repo)
+    if not targets:
+        _fail("Rien à évaluer : ni gap, ni hypothèse")
+    previous = current_ratings(repo.load_rating_sessions())
+    typer.echo(f"Échelle : {config.scale[0]} (très insuffisant) à {config.scale[-1]} (excellent) ; Entrée vide : passer")
+    ratings: list[Rating] = []
+    for target in targets:
+        criteria = config.gap_criteria if target.kind == "gap" else config.hypothesis_criteria
+        typer.echo(f"\n{target.target} (v{target.version}) — {target.title}\n{target.detail}")
+        if old := previous.get(target.target):
+            typer.echo(f"  note précédente : {old.scores}")
+        scores: dict[str, int] = {}
+        for criterion, question in criteria.items():
+            answer = typer.prompt(f"  {criterion} — {question}", default="", show_default=False).strip()
+            if not answer:
+                break
+            while not answer.isdigit() or int(answer) not in config.scale:
+                answer = typer.prompt(f"  {criterion} : note parmi {config.scale}").strip()
+            scores[criterion] = int(answer)
+        if len(scores) == len(criteria):
+            comment = typer.prompt("  commentaire", default="", show_default=False)
+            ratings.append(Rating(target=target.target, target_version=target.version, scores=scores, comment=comment))
+    if not ratings:
+        _fail("Aucune note complète : rien n'a été enregistré")
+    comment = typer.prompt("\nCommentaire général", default="", show_default=False)
+    try:
+        session = record_ratings(repo, settings, ratings, rater=getpass.getuser(), comment=comment)
+    except EvaluationError as exc:
+        _fail(f"Évaluation refusée : {exc}")
+    typer.echo(f"{session.session_id} : {len(ratings)} notes enregistrées par {session.rater} (human-evaluation.json)")
+
+
+@eval_app.command("summary")
+def eval_summary(as_json: JsonFlag = False) -> None:
+    """Synthèse de l'évaluation humaine, tous projets : sujets évalués (cible du MVP) et moyennes par critère."""
+    settings, db = _settings_and_db()
+    summary = evaluation_summary(db, settings)
+    if as_json:
+        _print_json({**dataclasses.asdict(summary), "target_met": summary.target_met})
+        return
+    status = "atteinte" if summary.target_met else "non atteinte"
+    typer.echo(f"Sujets évalués par un humain : {len(summary.rated_projects)} (cible {summary.min_rated_topics}, {status})")
+    for pid, topic in summary.rated_projects.items():
+        typer.echo(f"  {pid} — {topic}")
+    for criterion, average in summary.averages.items():
+        typer.echo(f"  {criterion:<16} {average}")
 
 
 # --- db ----------------------------------------------------------------------

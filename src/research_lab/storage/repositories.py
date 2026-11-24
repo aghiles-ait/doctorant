@@ -20,6 +20,7 @@ from pydantic import TypeAdapter
 from research_lab.config import PolicyConfig
 from research_lab.corpus import check_corpus
 from research_lab.schemas.critique import ObjectionResponse, ScientificReview
+from research_lab.schemas.evaluation import RatingSession
 from research_lab.schemas.evidence import Evidence, FulltextRecord, FulltextStatus
 from research_lab.schemas.gap import Alignment, Gap, GapDraft
 from research_lab.schemas.gate import Gate, GateDecision, GateDecisionType, GateSubmission
@@ -209,6 +210,20 @@ def next_objection_id(db: Database) -> str:
     row = db.conn.execute(f"SELECT objection_id FROM objections ORDER BY {_OBJECTION_ORDER} DESC LIMIT 1").fetchone()
     highest = int(row["objection_id"].split("-")[1]) if row else 0
     return f"OBJ-{highest + 1:03d}"
+
+
+def next_rating_session_id(db: Database) -> str:
+    row = db.conn.execute(
+        "SELECT session_id FROM rating_sessions ORDER BY CAST(substr(session_id, 6) AS INTEGER) DESC LIMIT 1"
+    ).fetchone()
+    highest = int(row["session_id"].split("-")[1]) if row else 0
+    return f"EVAL-{highest + 1:03d}"
+
+
+def load_all_rating_sessions(db: Database) -> list[RatingSession]:
+    """Évaluations humaines de tous les projets (synthèse : nombre de sujets évalués)."""
+    rows = db.conn.execute("SELECT record FROM rating_sessions ORDER BY rowid")
+    return [RatingSession.model_validate_json(r["record"]) for r in rows]
 
 
 # --- Texte intégral (partagé entre projets, fichiers dans knowledge/papers/) ----------
@@ -762,6 +777,22 @@ class ProjectRepository:
             )
         self.export()
 
+    # --- Évaluation humaine ------------------------------------------------------------
+
+    def load_rating_sessions(self) -> list[RatingSession]:
+        rows = self.db.conn.execute(
+            "SELECT record FROM rating_sessions WHERE project_id = ? ORDER BY rowid", (self.project_id,)
+        )
+        return [RatingSession.model_validate_json(r["record"]) for r in rows]
+
+    def record_rating_session(self, session: RatingSession) -> None:
+        with self.db.transaction() as conn:
+            conn.execute(
+                "INSERT INTO rating_sessions (session_id, project_id, rater, at, record) VALUES (?, ?, ?, ?, ?)",
+                (session.session_id, self.project_id, session.rater, session.at.isoformat(), session.model_dump_json()),
+            )
+        self.export()
+
     # --- Gates -----------------------------------------------------------------------
 
     def load_gate_submissions(self, gate: Gate) -> list[GateSubmission]:
@@ -951,6 +982,8 @@ class ProjectRepository:
             contents["solutions.json"] = dump(self.solutions_export())
         if reviews := self.critique_export():
             contents["scientific-review.json"] = dump(reviews)
+        if sessions := self.load_rating_sessions():
+            contents["human-evaluation.json"] = dump([x.model_dump(mode="json") for x in sessions])
         return contents
 
     def export(self) -> None:

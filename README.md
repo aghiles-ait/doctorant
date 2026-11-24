@@ -36,6 +36,10 @@ $L project transition decentralized-ai-governance LITERATURE_SEARCH
 # développement : n'importe quel état, en avant ou en arrière, sans précondition (hors gates) ;
 # la transition est marquée `forced` dans l'historique
 $L project transition decentralized-ai-governance SOLUTION_DESIGN --force
+# qualité : indicateurs Q1-Q5 ; notation humaine (dans ton terminal) ; synthèse tous projets
+$L eval report decentralized-ai-governance
+$L eval rate decentralized-ai-governance
+$L eval summary
 # reprise après interruption : état, étape, instructions humaines, blocages, exports périmés
 $L project resume decentralized-ai-governance [--repair]
 
@@ -338,10 +342,16 @@ de tes données de recherche.
   (`--repair` les régénère). Tests de reprise : nouvelle session, interruption avant l'export, au milieu
   d'une transaction ou d'une décision de gate.
 - `project transition --force` : n'importe quel état sans précondition, hors gates, tracé dans l'historique.
+- Évaluation de la qualité scientifique (`eval`) : `eval report <id>` calcule des indicateurs Q1 à Q5, revue
+  et workflow (identifiants, provenance, citations, lecture, recherches contradictoires, hypothèses testées,
+  limites, verdict, transitions forcées) ; ils mesurent ce qui est vérifiable, pas la valeur scientifique.
+  `eval rate <id>` : notation humaine des gaps retenus et des hypothèses selon la grille de
+  `research-policy.yaml` (terminal interactif, refusée à un agent comme les gates) ; `human-evaluation.json`.
+  `eval summary` : sujets évalués par un humain (cible du MVP : 3) et moyennes par critère.
 
 **Non implémenté**
 - Connecteurs Semantic Scholar et Crossref ; vérification de l'existence des DOI auprès de Crossref.
 - En `LITERATURE_REVIEW`, plus de nouvelle recherche bibliographique ; en `GAP_ANALYSIS`, seulement
   des recherches contradictoires. Le retour à `LITERATURE_SEARCH` passe par `gate revise`.
 - Pas de décision `reject` aux gates : `revise` couvre le besoin.
-- `templates/gap-record.json`, suivi des coûts, évaluations : sprint 4.
+- `templates/gap-record.json`, suivi des coûts : sprint 4.

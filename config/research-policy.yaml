@@ -35,6 +35,21 @@ scientific_review:
   # Au-delà, plus de nouveau tour de revue : en référer à l'humain (qui peut relever ce seuil).
   max_review_rounds: 3
 
+# Évaluation humaine de la qualité scientifique (spec §11) : un humain note les gaps et les hypothèses
+# (`research-lab eval rate`, dans son propre terminal). La nouveauté n'est pas mesurée par un score.
+evaluation:
+  scale: [1, 2, 3, 4, 5]   # 1 : très insuffisant ; 5 : excellent
+  gap_criteria:
+    reality: "Le manque est réel au vu de la littérature citée (pas un artefact du corpus)"
+    evidence: "Les preuves citées soutiennent le gap, preuves contraires comprises"
+    importance: "Combler ce gap ferait progresser le domaine"
+  hypothesis_criteria:
+    falsifiability: "Le critère de réfutation est observable et pourrait réellement être atteint"
+    relevance: "L'hypothèse répond à la question et au gap retenu"
+    testability: "Méthode et métriques permettent de la tester avec des moyens réalistes"
+  # Critère d'acceptation du MVP : revue humaine sur au moins ce nombre de sujets distincts.
+  min_rated_topics: 3
+
 # Règles que l'agent doit respecter (spec §8). Contrôles automatisés à partir du sprint 2.
 scientific_quality:
   never_fabricate_references: true

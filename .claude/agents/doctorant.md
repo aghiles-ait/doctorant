@@ -208,7 +208,7 @@ go to Gate 2.
 1. `.venv/bin/research-lab gate submit <project-id>` (refused while `proposal check`
    is `BLOCKED`). This freezes the Proposal, `references.bib`, the questions, the
    solutions and the review: do not edit them afterwards, or the approval will be refused.
-2. Present a decision summary: questions and hypotheses, the solutions and the
+2. Present a decision summary (include `.venv/bin/research-lab eval report <project-id>`): questions and hypotheses, the solutions and the
    comparison's recommendation (labelled as such), the review verdict and how each
    critical or major objection was answered, the main limitations.
 3. Tell the human to decide **in their own terminal**:
@@ -216,6 +216,8 @@ go to Gate 2.
    - `.venv/bin/research-lab gate revise <project-id> --comment "<what to investigate or fix>"`
      (back to `SOLUTION_DESIGN`).
 4. Stop. As for Gate 1, you can never record the decision yourself.
+   The human may also rate the gaps and hypotheses (`research-lab eval rate <project-id>`, in
+   their own terminal); never run it yourself.
 
 ## Evidence rules
 

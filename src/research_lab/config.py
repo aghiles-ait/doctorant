@@ -62,6 +62,15 @@ class SourcesConfig(BaseModel):
     fulltext: FulltextConfig = FulltextConfig()
 
 
+class HumanEvaluationConfig(BaseModel):
+    """Grille de l'évaluation humaine des gaps et des hypothèses (spec §11)."""
+
+    scale: list[int] = Field(default=[1, 2, 3, 4, 5], min_length=2)
+    gap_criteria: dict[str, str] = Field(min_length=1)
+    hypothesis_criteria: dict[str, str] = Field(min_length=1)
+    min_rated_topics: int = Field(default=3, ge=1)
+
+
 class PolicyConfig(BaseModel):
     version: str
     min_corpus_size: int = Field(ge=0)
@@ -80,6 +89,9 @@ class PolicyConfig(BaseModel):
     # Revue critique : preuves du raisonnement que le reviewer doit relire, nombre maximal de tours.
     min_verified_evidence: int = Field(default=5, ge=1)
     max_review_rounds: int = Field(default=3, ge=1)
+    evaluation: HumanEvaluationConfig = HumanEvaluationConfig(
+        gap_criteria={"reality": "Le manque est réel"}, hypothesis_criteria={"falsifiability": "Réfutable"}
+    )
 
 
 class ValueDefinition(BaseModel):
@@ -173,6 +185,7 @@ def load_settings(root: Path | None = None) -> Settings:
             **policy_raw.get("gap_analysis", {}),
             **policy_raw.get("solution_design", {}),
             **policy_raw.get("scientific_review", {}),
+            **({"evaluation": policy_raw["evaluation"]} if "evaluation" in policy_raw else {}),
         }
     )
     values = ValuesConfig.model_validate(_load_yaml(root / "config" / "research-values.yaml"))
