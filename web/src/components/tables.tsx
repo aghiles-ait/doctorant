@@ -6,6 +6,22 @@ import { Badge, Empty, Figures, type Tone } from "./ui";
 const STATUS_FR: Record<string, string> = { candidate: "à trier", included: "incluse", excluded: "exclue" };
 const STATUS_TONE: Record<string, Tone> = { included: "ok", excluded: "bad", candidate: "gate" };
 
+// « §2 — … », ou les formes plus anciennes « §2 exclu : … », « §5 inclusion : … » : le statut est déjà affiché.
+const REASON = /^§(\d+)\s*(?:(?:inclu|exclu)\w*\s*)?[—–:-]?\s*/i;
+
+function Reason({ reason, sections }: { reason: string; sections: Record<string, string> }) {
+  const match = reason.match(REASON);
+  if (!match) return <div className="sub">Motif : {reason}</div>;
+  const section = sections[match[1]];
+  const rest = reason.slice(match[0].length);
+  return (
+    <div className="sub reason">
+      <span className="badge" title="section de scope.md">§{match[1]}{section ? ` ${section}` : ""}</span>{" "}
+      {rest.charAt(0).toUpperCase() + rest.slice(1)}
+    </div>
+  );
+}
+
 export function SearchTable({ project }: { project: ProjectView }) {
   if (!project.search_log.length) return null;
   return (
@@ -65,7 +81,7 @@ export function CorpusTable({ project, only }: { project: ProjectView; only?: st
               <td>
                 {p.url ? <a href={p.url} target="_blank" rel="noopener noreferrer">{p.title}</a> : p.title}
                 {p.venue && <div className="sub">{p.venue}</div>}
-                {p.reason && !only && <div className="sub">tri : {p.reason}</div>}
+                {p.reason && !only && <Reason reason={p.reason} sections={project.scope_sections} />}
               </td>
               <td>{p.year}</td>
               {!only && <><td><Badge tone={STATUS_TONE[p.status]}>{STATUS_FR[p.status] ?? p.status}</Badge></td>

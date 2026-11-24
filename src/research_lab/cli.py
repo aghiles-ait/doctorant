@@ -358,7 +358,7 @@ def corpus_decide(
     project_id: ProjectId,
     paper_id: Annotated[str, typer.Argument()],
     include: Annotated[bool | None, typer.Option("--include/--exclude", help="Inclure ou exclure")] = None,
-    reason: Annotated[str, typer.Option(help="Justification au regard des critères de scope.md")] = "",
+    reason: Annotated[str, typer.Option(help="« §N — justification » : section de scope.md qui fonde la décision")] = "",
 ) -> None:
     """Trie une publication (LITERATURE_REVIEW, ou candidates en GAP_ANALYSIS) ; la décision est historisée."""
     _, repo = _context(project_id)

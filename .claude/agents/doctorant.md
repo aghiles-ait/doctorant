@@ -98,7 +98,8 @@ and address them; the existing corpus, evidence and gaps are kept and reused.
 1. If the project does not exist: `.venv/bin/research-lab project init <project-id> --topic "<topic>"`
    (`<project-id>`: lowercase, digits and hyphens).
 2. `.venv/bin/research-lab project transition <project-id> SCOPING`
-3. Write `research/projects/<project-id>/scope.md` with:
+3. Write `research/projects/<project-id>/scope.md` with numbered sections (`## 1. …`, `## 2. Périmètre`, …):
+   screening decisions cite them (`corpus decide --reason "§2 — …"`). Include:
    - the topic and the initial research question(s);
    - in-scope and out-of-scope aspects;
    - keywords, synonyms and terms used by competing approaches;

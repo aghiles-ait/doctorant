@@ -64,7 +64,7 @@ def repo(settings) -> ProjectRepository:
     repo.create("Decentralized AI governance", actor="alice")
     policy = settings.policy.model_copy(update={"min_corpus_size": 0})
     repo.transition(ResearchState.SCOPING, actor="alice", policy=policy)
-    repo.scope_file.write_text("# Scope\nGouvernance décentralisée de l'IA.\n")
+    repo.scope_file.write_text("# Scope\n\n## 1. Question\nGouvernance décentralisée de l'IA.\n\n## 2. Périmètre\nInclus : gouvernance décentralisée.\n")
     repo.transition(ResearchState.LITERATURE_SEARCH, actor="alice", policy=policy)
     hits = [
         SourceHit(source=Source.ARXIV, source_id="2510.03368", metadata=PaperMetadata(
@@ -92,9 +92,9 @@ def fetcher(settings):
 
 @pytest.fixture
 def included(repo):
-    decide(repo, "PAPER-001", PaperStatus.INCLUDED, "Cadre de gouvernance décentralisée", "alice")
-    decide(repo, "PAPER-002", PaperStatus.INCLUDED, "Pertinent", "alice")
-    decide(repo, "PAPER-003", PaperStatus.EXCLUDED, "Hors sujet", "alice")
+    decide(repo, "PAPER-001", PaperStatus.INCLUDED, "§2 — cadre de gouvernance décentralisée", "alice")
+    decide(repo, "PAPER-002", PaperStatus.INCLUDED, "§2 — gouvernance par plusieurs parties", "alice")
+    decide(repo, "PAPER-003", PaperStatus.EXCLUDED, "§2 — jeu de données sans gouvernance", "alice")
     return repo
 
 
@@ -142,7 +142,7 @@ def _evidence(repo, settings, **kwargs):
 def test_screening_updates_status_and_keeps_history(included):
     included_ids = [p.paper_id for p in included.load_papers() if p.status == PaperStatus.INCLUDED]
     assert included_ids == ["PAPER-001", "PAPER-002"]
-    decide(included, "PAPER-003", PaperStatus.INCLUDED, "Relecture : finalement pertinent", "alice")
+    decide(included, "PAPER-003", PaperStatus.INCLUDED, "§2 — relu : la gouvernance est bien décentralisée", "alice")
     history = [(d.paper_id, d.decision) for d in included.load_decisions()]
     assert history[-2:] == [("PAPER-003", PaperStatus.EXCLUDED), ("PAPER-003", PaperStatus.INCLUDED)]
 
@@ -152,6 +152,18 @@ def test_screening_requires_literature_review_state(settings):
     repo.create("x", actor="alice")
     with pytest.raises(ReviewError, match="LITERATURE_REVIEW"):
         decide(repo, "PAPER-001", PaperStatus.INCLUDED, "r", "alice")
+
+
+@pytest.mark.parametrize(("reason", "message"), [
+    ("Pertinent", "« §N — justification »"),
+    ("§9 — hors du périmètre défini", "§9 n'existe pas"),
+    ("§2 — oui", "trop courte"),
+])
+def test_screening_reason_cites_a_scope_section(repo, reason, message):
+    with pytest.raises(ReviewError, match=message) as refused:
+        decide(repo, "PAPER-001", PaperStatus.INCLUDED, reason, "alice")
+    assert "§2 Périmètre" in str(refused.value) or "trop courte" in str(refused.value)  # sections de scope.md listées
+    assert repo.get_paper("PAPER-001").status == PaperStatus.CANDIDATE
 
 
 def test_cannot_exclude_paper_with_active_evidence(with_fulltext, settings):
@@ -307,3 +319,9 @@ def test_gap_analysis_after_complete_review(with_fulltext, settings):
     (with_fulltext.dir / "literature-review.md").write_text("# État de l'art\nResponsabilité [PAPER-001, EV-001].\n")
     project = with_fulltext.transition(ResearchState.GAP_ANALYSIS, actor="alice", policy=settings.policy)
     assert project.state == ResearchState.GAP_ANALYSIS
+
+
+def test_scope_sections_are_numbered_level_two_headings():
+    from research_lab.scope import scope_sections
+    text = "# Scope\n## 1. Question\n### Inclus\n## 5. Critères de sélection (appliqués au sprint 2)\n## Annexe\n"
+    assert scope_sections(text) == {"1": "Question", "5": "Critères de sélection"}

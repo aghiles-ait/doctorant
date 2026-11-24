@@ -66,8 +66,8 @@ def test_scenario_sprints_1_2(lab_root, fixture_text, tmp_path, monkeypatch):
         run("project", "transition", PROJECT, "SCOPING")
         run("project", "transition", PROJECT, "LITERATURE_SEARCH", expect=1)
         (project_dir / "scope.md").write_text(
-            "# Périmètre\nQuestion : comment gouverner des agents IA décentralisés de façon vérifiable ?\n"
-            "Inclus : gouvernance décentralisée, agents autonomes. Exclus : jeux de données, véhicules.\n")
+            "# Scope\n\n## 1. Question\nComment gouverner des agents IA décentralisés de façon vérifiable ?\n\n"
+            "## 2. Périmètre\nInclus : gouvernance décentralisée, agents autonomes. Exclus : jeux de données, véhicules.\n")
         run("project", "transition", PROJECT, "LITERATURE_SEARCH")
 
         step("SPRINT 1 — Veille : arXiv + OpenAlex, déduplication, provenance, journal")
@@ -97,9 +97,9 @@ def test_scenario_sprints_1_2(lab_root, fixture_text, tmp_path, monkeypatch):
         dam, governance = ids["2504.15676"], ids["2505.04136"]
         for paper_id in ids.values():
             if paper_id in (dam, governance):
-                run("corpus", "decide", PROJECT, paper_id, "--include", "--reason", "Gouvernance d'agents décentralisés")
+                run("corpus", "decide", PROJECT, paper_id, "--include", "--reason", "§2 — gouvernance d'agents décentralisés")
             else:
-                run("corpus", "decide", PROJECT, paper_id, "--exclude", "--reason", "Hors périmètre (scope.md)")
+                run("corpus", "decide", PROJECT, paper_id, "--exclude", "--reason", "§2 — jeux de données ou véhicules, exclus")
 
         step("SPRINT 2b — Texte intégral des publications incluses")
         run("fulltext", "fetch", PROJECT)

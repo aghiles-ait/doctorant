@@ -26,10 +26,12 @@ publication est refusée. Ne contourne jamais ce contrôle en reformulant un ext
 2. **Trier chaque candidat** à partir du titre et du résumé (`corpus show <id> PAPER-xxx`), au regard
    des critères de `scope.md` uniquement — pas des valeurs de `research-values.yaml` :
    ```
-   .venv/bin/research-lab corpus decide <id> PAPER-xxx --include --reason "<critère satisfait>"
-   .venv/bin/research-lab corpus decide <id> PAPER-xxx --exclude --reason "<critère d'exclusion>"
+   .venv/bin/research-lab corpus decide <id> PAPER-xxx --include --reason "§2 — gouvernance d'agents IA par une DAO"
+   .venv/bin/research-lab corpus decide <id> PAPER-xxx --exclude --reason "§2 — gouvernance d'entreprise, sans mécanisme décentralisé"
    ```
-   La raison cite le critère concerné. En cas de doute, inclure : l'exclusion se justifie, l'inclusion se vérifie à la lecture.
+   La raison suit le format `§N — justification` (refusé sinon) : `N` est la section numérotée de `scope.md`
+   qui fonde la décision, la justification dit en quoi la publication relève ou non de ce critère. Ne pas répéter
+   « inclus » ou « exclu » : la décision le dit déjà. En cas de doute, inclure : l'exclusion se justifie, l'inclusion se vérifie à la lecture.
    Un travail qui contredit l'hypothèse de départ ou les valeurs du projet **est inclus** s'il est dans le périmètre.
 
 3. **Récupérer le texte intégral** des publications incluses :
