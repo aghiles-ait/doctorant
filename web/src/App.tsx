@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
+import { ConfigPage } from "./components/ConfigPage";
 import { DocumentDialog } from "./components/DocumentDialog";
 import { NextStep } from "./components/NextStep";
 import { ProjectList } from "./components/ProjectList";
@@ -9,9 +10,12 @@ import { CostsPanel, HistoryTable, QualityTable } from "./components/tables";
 import type { ProjectSummary, ProjectView, State, Workflow } from "./types";
 import { STATES, fmtDate } from "./workflow";
 
-// Adresse : #/<projet>/<état sélectionné>
-function readHash(): { id?: string; state?: State } {
+const CONFIG = "parametres";
+
+// Adresse : #/<projet>/<état sélectionné>, ou #/parametres
+function readHash(): { id?: string; state?: State; config?: boolean } {
   const [id, state] = decodeURIComponent(location.hash.replace(/^#\/?/, "")).split("/");
+  if (id === CONFIG) return { config: true };
   return { id: id || undefined, state: state in STATES ? (state as State) : undefined };
 }
 
@@ -45,8 +49,9 @@ export function App() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (projectId) history.replaceState(null, "", `#/${projectId}/${state ?? ""}`);
-  }, [projectId, state]);
+    if (selected.config) history.replaceState(null, "", `#/${CONFIG}`);
+    else if (projectId) history.replaceState(null, "", `#/${projectId}/${state ?? ""}`);
+  }, [selected.config, projectId, state]);
 
   const openDocument = async (name: string) => {
     if (!project) return;
@@ -58,6 +63,10 @@ export function App() {
     <>
       <header className="top">
         <h1>Laboratoire doctorant</h1>
+        <nav className="tabs">
+          <button className={selected.config ? "" : "on"} onClick={() => setSelected({ id: projectId })}>Projets</button>
+          <button className={selected.config ? "on" : ""} onClick={() => setSelected({ config: true })}>Paramètres</button>
+        </nav>
         <span className="gen">
           {error ? <span className="err">Serveur injoignable : {error}</span>
             : updatedAt && `données du ${updatedAt.toLocaleTimeString("fr-FR")} · recharger la page pour actualiser`}
@@ -67,10 +76,10 @@ export function App() {
         <aside>
           <h2>Projets</h2>
           {workflow && <ProjectList projects={projects} states={workflow.states} selected={projectId}
-            onSelect={(id) => { setSelected({ id }); setProject(undefined); }} />}
+            onSelect={(id) => { setSelected({ id }); if (id !== project?.id) setProject(undefined); }} />}
         </aside>
         <main>
-          {!project || !workflow || !state ? <p className="empty">{error ? "" : "Chargement…"}</p> : (
+          {selected.config ? <ConfigPage /> : !project || !workflow || !state ? <p className="empty">{error ? "" : "Chargement…"}</p> : (
             <>
               <div className="phead">
                 <h2>{project.topic}</h2>

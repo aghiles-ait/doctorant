@@ -17,7 +17,12 @@ a { color: var(--accent); }
 
 header.top { display: flex; align-items: baseline; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
 header.top h1 { font-size: 16px; margin: 0; }
-header.top .gen { color: var(--muted); font-size: 12px; }
+header.top .gen { color: var(--muted); font-size: 12px; margin-left: auto; }
+.tabs { display: flex; gap: 4px; margin-left: 12px; }
+.tabs button { font: inherit; font-size: 13px; padding: 4px 12px; border-radius: 999px; border: 1px solid transparent;
+  background: none; color: var(--muted); cursor: pointer; }
+.tabs button:hover { color: var(--ink); }
+.tabs button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 header.top .err { color: var(--bad); }
 
 .layout { display: grid; grid-template-columns: 290px minmax(0, 1fr); min-height: calc(100vh - 50px); }
@@ -82,6 +87,10 @@ main { padding: 18px 24px 40px; min-width: 0; overflow-wrap: anywhere; }
 .file.missing { color: var(--muted); border-style: dashed; }
 .file:not(.missing):hover { border-color: var(--accent); }
 button.file { cursor: pointer; font: inherit; font-size: 13px; }
+.file.small { font-size: 11px; padding: 1px 8px; margin-left: 8px; font-weight: normal; vertical-align: 1px; }
+.reason { margin-top: 2px; }
+td.num { text-align: right; white-space: nowrap; }
+pre.raw { white-space: pre-wrap; font-size: 12.5px; line-height: 1.5; margin: 12px 0; }
 
 .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 8px 0; }
 .kv div { background: var(--bg); border-radius: 8px; padding: 8px 10px; }

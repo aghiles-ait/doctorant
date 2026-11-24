@@ -84,4 +84,35 @@ export interface ProjectView {
   quality: Indicator[]; ratings: RatingSession[];
   costs: { total: number; responses: number; by_agent: Record<string, number>; by_state: Record<string, number> };
   documents: string[];
+  scope_sections: Record<string, string>;
+}
+
+export interface ProviderSettings {
+  enabled: boolean; base_url: string; page_size: number; timeout_seconds: number; min_interval_seconds: number;
+  categories: string[]; filters: string[];
+}
+
+export interface Config {
+  policy: {
+    min_corpus_size: number; allow_partial_search: boolean; max_examinable_results: number; min_quote_chars: number;
+    require_full_reading: boolean; min_supporting_papers: number; min_solution_alternatives: number;
+    min_verified_evidence: number; max_review_rounds: number;
+    evaluation: { scale: number[]; gap_criteria: Record<string, string>; hypothesis_criteria: Record<string, string>; min_rated_topics: number };
+  };
+  values: {
+    values: Record<string, { description: string; weight: number }>;
+    evaluation: { scale: number[]; require_justification: boolean; report_tradeoffs: boolean; allow_not_applicable: boolean };
+  };
+  scoring: { priority: { weights: Record<string, number>; evidence_strength: Record<string, number> } };
+  sources: {
+    default_sources: string[]; default_max_results: number;
+    retry: { max_attempts: number; delays_seconds: number[]; max_retry_after_seconds: number };
+    providers: Record<string, ProviderSettings>;
+    fulltext: { max_pdf_mb: number; min_extracted_chars: number; max_show_chars: number; min_interval_seconds: number };
+  };
+  costs: {
+    transcripts_dir: string; research_agents: string[];
+    prices: Record<string, { input: number; output: number; cache_write_5m: number; cache_write_1h: number; cache_read: number }>;
+  };
+  config_hash: string; values_hash: string; files: Record<string, string>;
 }

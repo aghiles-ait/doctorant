@@ -49,3 +49,11 @@ def test_files_and_documents_are_whitelisted(client):
 
 def test_compiled_interface_is_served(client):
     assert "<title>ui</title>" in client.get("/").text
+
+
+def test_global_configuration_is_exposed(client):
+    config = client.get("/api/config").json()
+    assert "min_corpus_size" in config["policy"] and "privacy" in config["values"]["values"]
+    assert config["costs"]["prices"]["claude-opus-5-5"]["output"] == 20.0
+    assert config["config_hash"].startswith("sha256:")
+    assert "max_review_rounds" in config["files"]["research-policy.yaml"]  # texte commenté du fichier

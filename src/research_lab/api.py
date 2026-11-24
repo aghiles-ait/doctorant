@@ -17,7 +17,15 @@ from fastapi.staticfiles import StaticFiles
 from research_lab.config import Settings, load_settings
 from research_lab.storage.database import Database
 from research_lab.storage.repositories import ProjectRepository, pdf_path
-from research_lab.views import DELIVERABLES, DOCUMENTS, project_ids, project_summary, project_view, workflow
+from research_lab.views import (
+    DELIVERABLES,
+    DOCUMENTS,
+    config_view,
+    project_ids,
+    project_summary,
+    project_view,
+    workflow,
+)
 
 _DELIVERABLE_FILES = {name for names in DELIVERABLES.values() for name in names}
 _PAPER_ID = re.compile(r"^PAPER-\d{3,}$")
@@ -46,6 +54,11 @@ def create_app(root: Path | None = None, web_dist: Path | None = None) -> FastAP
     def get_workflow() -> dict:
         """États du workflow et livrables produits à chaque état."""
         return workflow()
+
+    @app.get("/api/config")
+    def get_config() -> dict:
+        """Paramètres communs à tous les projets (config/*.yaml), en lecture seule."""
+        return config_view(load_settings(root))
 
     @app.get("/api/projects")
     def list_projects() -> list[dict]:
