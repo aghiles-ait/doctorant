@@ -40,6 +40,8 @@ $L project transition decentralized-ai-governance SOLUTION_DESIGN --force
 $L eval report decentralized-ai-governance
 $L eval rate decentralized-ai-governance
 $L eval summary
+# coûts en équivalent API : par projet, ou toute la base
+$L costs report decentralized-ai-governance
 # reprise après interruption : état, étape, instructions humaines, blocages, exports périmés
 $L project resume decentralized-ai-governance [--repair]
 
@@ -348,10 +350,15 @@ de tes données de recherche.
   `eval rate <id>` : notation humaine des gaps retenus et des hypothèses selon la grille de
   `research-policy.yaml` (terminal interactif, refusée à un agent comme les gates) ; `human-evaluation.json`.
   `eval summary` : sujets évalués par un humain (cible du MVP : 3) et moyennes par critère.
+- Suivi des coûts (`costs`) : `costs sync` lit les transcriptions de Claude Code (jetons de chaque réponse
+  du modèle) et les conserve dans la base, une seule fois par réponse ; un hook le lance à la fin de chaque
+  sous-agent et de chaque session. `costs report [<id>]` : coût en équivalent API (prix de
+  `config/costs.yaml`) par agent, état du workflow et modèle. Seuls les agents de recherche sont attribués
+  à un projet ; le développement du laboratoire est compté à part (`main`).
 
 **Non implémenté**
 - Connecteurs Semantic Scholar et Crossref ; vérification de l'existence des DOI auprès de Crossref.
 - En `LITERATURE_REVIEW`, plus de nouvelle recherche bibliographique ; en `GAP_ANALYSIS`, seulement
   des recherches contradictoires. Le retour à `LITERATURE_SEARCH` passe par `gate revise`.
 - Pas de décision `reject` aux gates : `revise` couvre le besoin.
-- `templates/gap-record.json`, suivi des coûts : sprint 4.
+- `templates/gap-record.json` : sprint 4.

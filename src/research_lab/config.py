@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 
 import yaml
@@ -94,6 +95,25 @@ class PolicyConfig(BaseModel):
     )
 
 
+class ModelPrice(BaseModel):
+    """Prix en dollars par million de jetons."""
+
+    input: float = Field(ge=0)
+    output: float = Field(ge=0)
+    cache_write_5m: float = Field(ge=0)
+    cache_write_1h: float = Field(ge=0)
+    cache_read: float = Field(ge=0)
+
+
+class CostsConfig(BaseModel):
+    """config/costs.yaml : suivi des coûts des agents (sprint 4)."""
+
+    version: str
+    transcripts_dir: str = ""
+    research_agents: list[str] = Field(min_length=1)
+    prices: dict[str, ModelPrice] = Field(min_length=1)
+
+
 class ValueDefinition(BaseModel):
     description: str
     weight: float = Field(ge=0)
@@ -136,6 +156,7 @@ class Settings(BaseModel):
     policy: PolicyConfig
     values: ValuesConfig
     scoring: ScoringConfig
+    costs: CostsConfig
 
     @property
     def projects_dir(self) -> Path:
@@ -148,6 +169,13 @@ class Settings(BaseModel):
     @property
     def papers_dir(self) -> Path:
         return self.root / "knowledge" / "papers"
+
+    @property
+    def transcripts_dir(self) -> Path:
+        """Transcriptions de Claude Code pour ce dépôt."""
+        if self.costs.transcripts_dir:
+            return Path(self.costs.transcripts_dir).expanduser()
+        return Path.home() / ".claude" / "projects" / re.sub(r"[^A-Za-z0-9]", "-", str(self.root.resolve()))
 
     def config_hash(self) -> str:
         """Empreinte de la configuration effective, consignée dans chaque recherche."""
@@ -190,4 +218,5 @@ def load_settings(root: Path | None = None) -> Settings:
     )
     values = ValuesConfig.model_validate(_load_yaml(root / "config" / "research-values.yaml"))
     scoring = ScoringConfig.model_validate(_load_yaml(root / "config" / "scoring.yaml"))
-    return Settings(root=root, sources=sources, policy=policy, values=values, scoring=scoring)
+    costs = CostsConfig.model_validate(_load_yaml(root / "config" / "costs.yaml"))
+    return Settings(root=root, sources=sources, policy=policy, values=values, scoring=scoring, costs=costs)

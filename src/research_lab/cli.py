@@ -13,6 +13,7 @@ from pydantic import BaseModel, ValidationError
 
 from research_lab.config import Settings, load_settings
 from research_lab.corpus import CorpusStatus, check_corpus
+from research_lab.costs import Line, cost_report, load_usage, sync
 from research_lab.critique import CritiqueError, check_critique, respond, submit_review
 from research_lab.evaluation import (
     EvaluationError,
@@ -96,6 +97,10 @@ eval_app = typer.Typer(
     help="Évaluation de la qualité scientifique : indicateurs Q1 à Q5, notation humaine des gaps et hypothèses.",
     no_args_is_help=True,
 )
+costs_app = typer.Typer(
+    help="Suivi des coûts : jetons consommés par les agents, d'après les transcriptions de Claude Code.",
+    no_args_is_help=True,
+)
 app.add_typer(project_app, name="project")
 app.add_typer(watch_app, name="watch")
 app.add_typer(corpus_app, name="corpus")
@@ -110,6 +115,7 @@ app.add_typer(solution_app, name="solution")
 app.add_typer(critique_app, name="critique")
 app.add_typer(proposal_app, name="proposal")
 app.add_typer(eval_app, name="eval")
+app.add_typer(costs_app, name="costs")
 app.add_typer(db_app, name="db")
 
 ProjectId = Annotated[str, typer.Argument(help="Identifiant du projet (ex. decentralized-ai-governance)")]
@@ -1331,6 +1337,53 @@ def eval_summary(as_json: JsonFlag = False) -> None:
         typer.echo(f"  {pid} — {topic}")
     for criterion, average in summary.averages.items():
         typer.echo(f"  {criterion:<16} {average}")
+
+
+# --- costs -------------------------------------------------------------------
+
+
+@costs_app.command("sync")
+def costs_sync(quiet: Annotated[bool, typer.Option("--quiet", help="Sans sortie (hook de Claude Code)")] = False) -> None:
+    """Enregistre dans la base la consommation lue dans les transcriptions de Claude Code (idempotent)."""
+    settings, db = _settings_and_db()
+    count = sync(db, settings)
+    if not quiet:
+        typer.echo(f"{count} réponses du modèle enregistrées (transcriptions : {settings.transcripts_dir})")
+
+
+def _cost_lines(title: str, lines: dict[str, Line]) -> None:
+    typer.echo(f"{title} :")
+    for name, line in sorted(lines.items(), key=lambda item: -item[1].cost):
+        typer.echo(f"  {name:<24} {line.cost:>9.2f} $  {line.responses:>6} réponses  "
+                   f"entrée {line.input_tokens:>11,}  sortie {line.output_tokens:>9,}  cache lu {line.cache_read_tokens:>13,}")
+
+
+@costs_app.command("report")
+def costs_report(
+    project_id: Annotated[str | None, typer.Argument(help="Projet (défaut : toute la base, projets et développement)")] = None,
+    as_json: JsonFlag = False,
+) -> None:
+    """Coût en équivalent API par agent, état du workflow et modèle (synchronise d'abord)."""
+    settings, db = _settings_and_db()
+    sync(db, settings)
+    project = None
+    if project_id:
+        repo = ProjectRepository(db, settings.projects_dir, project_id, settings.papers_dir)
+        _require_project(repo)
+        project = repo.load_project()
+    report = cost_report(load_usage(db, project_id), settings.costs.prices, project)
+    if as_json:
+        _print_json(dataclasses.asdict(report))
+        return
+    scope = project_id or "toute la base"
+    typer.echo(f"Coûts ({scope}) : {report.total.cost:.2f} $ en équivalent API, {report.total.responses} réponses, "
+               f"{report.agent_runs} sessions ou sous-agents")
+    _cost_lines("Par agent", report.by_agent)
+    if report.by_state:
+        _cost_lines("Par état du workflow", report.by_state)
+    _cost_lines("Par modèle", report.by_model)
+    if report.unpriced_models:
+        typer.echo(f"Modèles sans prix (config/costs.yaml) : {', '.join(report.unpriced_models)}")
 
 
 # --- db ----------------------------------------------------------------------

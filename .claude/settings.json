@@ -34,5 +34,27 @@
       "Write(knowledge/papers/**)",
       "Bash(sqlite3 *)"
     ]
+  },
+  "hooks": {
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.venv/bin/research-lab costs sync --quiet || true"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.venv/bin/research-lab costs sync --quiet || true"
+          }
+        ]
+      }
+    ]
   }
 }

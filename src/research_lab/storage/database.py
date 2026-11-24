@@ -425,6 +425,28 @@ _MIGRATIONS: list[str] = [
     CREATE TRIGGER rating_sessions_no_delete BEFORE DELETE ON rating_sessions
     BEGIN SELECT RAISE(ABORT, 'une évaluation humaine est immuable'); END;
     """,
+    # 11 — consommation de jetons des agents, lue dans les transcriptions de Claude Code (sprint 4)
+    """
+    CREATE TABLE llm_usage (
+        message_id         TEXT PRIMARY KEY,  -- identifiant de la réponse du modèle : une seule fois
+        session_id         TEXT NOT NULL,
+        agent_id           TEXT,              -- sous-agent, ou NULL pour la session principale
+        agent_type         TEXT NOT NULL,     -- doctorant, scientific-reviewer, main…
+        project_id         TEXT,              -- NULL : hors agent de recherche ou projet non identifié
+        model              TEXT NOT NULL,
+        at                 TEXT NOT NULL,
+        input_tokens       INTEGER NOT NULL,
+        output_tokens      INTEGER NOT NULL,
+        cache_write_5m     INTEGER NOT NULL,
+        cache_write_1h     INTEGER NOT NULL,
+        cache_read_tokens  INTEGER NOT NULL
+    );
+    CREATE INDEX llm_usage_project ON llm_usage (project_id);
+    CREATE TRIGGER llm_usage_append_only BEFORE UPDATE ON llm_usage
+    BEGIN SELECT RAISE(ABORT, 'la consommation enregistrée est en ajout seul'); END;
+    CREATE TRIGGER llm_usage_no_delete BEFORE DELETE ON llm_usage
+    BEGIN SELECT RAISE(ABORT, 'la consommation enregistrée est en ajout seul'); END;
+    """,
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)
