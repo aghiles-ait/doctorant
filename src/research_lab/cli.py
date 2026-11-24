@@ -12,13 +12,20 @@ from pydantic import BaseModel, ValidationError
 
 from research_lab.config import Settings, load_settings
 from research_lab.corpus import CorpusStatus, check_corpus
+from research_lab.critique import CritiqueError, check_critique, respond, submit_review
 from research_lab.fulltext import FulltextFetcher
 from research_lab.gaps import GapError, add_gap, check_gaps, revise_gap, set_alignment
 from research_lab.schemas.gap import AlignmentDraft, GapDraft
+from research_lab.proposal import ProposalError, check_proposal_file, write_references
 from research_lab.providers import build_providers
+from research_lab.questions import QuestionError, add_question, check_questions, revise_question
 from research_lab.review import ReviewError, add_evidence, decide, fetch_fulltexts, withdraw_evidence
 from research_lab.schemas.evidence import EvidenceType, FulltextStatus
 from research_lab.schemas.paper import PaperStatus, Source
+from research_lab.schemas.critique import ResponseAction, ResponseDraft, ReviewDraft
+from research_lab.schemas.question import QuestionDraft
+from research_lab.schemas.solution import ComparisonDraft, SolutionDraft
+from research_lab.solutions import SolutionError, add_solution, check_solutions, revise_solution, set_comparison
 from research_lab.schemas.search import SearchQuery, SearchStatus
 from research_lab.storage.database import Database
 from research_lab.storage.repositories import (
@@ -32,14 +39,18 @@ from research_lab.storage.repositories import (
 )
 from research_lab.validation.outputs import check_literature_review
 from research_lab.watch import SearchNotAllowed, run_search
-from research_lab.schemas.gate import Gate, GateDecisionType
+from research_lab.schemas.gate import Gate, GateDecisionType, GateSubmission
 from research_lab.workflow.approvals import (
+    DECISION_TARGETS,
     GateError,
+    current_gate,
     decide_gate_1,
+    decide_gate_2,
     human_check_failure,
     latest_submission,
     modified_artifacts,
     submit_gate_1,
+    submit_gate_2,
 )
 from research_lab.workflow.state import ResearchState
 from research_lab.workflow.transitions import TransitionError
@@ -54,7 +65,21 @@ evidence_app = typer.Typer(help="Preuves extraites des publications (EV-xxx).", 
 review_app = typer.Typer(help="Contrôle de l'état de l'art (literature-review.md).", no_args_is_help=True)
 gap_app = typer.Typer(help="Gaps scientifiques (GAP-xxx), skill gap-analysis.", no_args_is_help=True)
 alignment_app = typer.Typer(help="Évaluation des gaps au regard des valeurs, skill values-alignment.", no_args_is_help=True)
-gate_app = typer.Typer(help="Gate 1 : validation humaine de la problématique.", no_args_is_help=True)
+question_app = typer.Typer(
+    help="Questions de recherche et hypothèses falsifiables (RQ-xxx), skill problem-formulation.", no_args_is_help=True
+)
+solution_app = typer.Typer(
+    help="Solutions conceptuelles (SOL-xxx) et leur comparaison, skill solution-architect.", no_args_is_help=True
+)
+critique_app = typer.Typer(
+    help="Revue critique indépendante (agent scientific-reviewer, skill scientific-critic).", no_args_is_help=True
+)
+proposal_app = typer.Typer(
+    help="Research Proposal (research-proposal.md, references.bib), skill research-writer.", no_args_is_help=True
+)
+gate_app = typer.Typer(
+    help="Validations humaines : Gate 1 (gaps retenus), Gate 2 (Research Proposal).", no_args_is_help=True
+)
 app.add_typer(project_app, name="project")
 app.add_typer(watch_app, name="watch")
 app.add_typer(corpus_app, name="corpus")
@@ -64,6 +89,10 @@ app.add_typer(review_app, name="review")
 app.add_typer(gap_app, name="gap")
 app.add_typer(alignment_app, name="alignment")
 app.add_typer(gate_app, name="gate")
+app.add_typer(question_app, name="question")
+app.add_typer(solution_app, name="solution")
+app.add_typer(critique_app, name="critique")
+app.add_typer(proposal_app, name="proposal")
 app.add_typer(db_app, name="db")
 
 ProjectId = Annotated[str, typer.Argument(help="Identifiant du projet (ex. decentralized-ai-governance)")]
@@ -631,45 +660,84 @@ def alignment_show(project_id: ProjectId, as_json: JsonFlag = False) -> None:
 
 @gate_app.command("submit")
 def gate_submit(project_id: ProjectId) -> None:
-    """Soumet l'analyse des gaps à la Gate 1 : fige les livrables, puis attend la décision humaine."""
+    """Soumet le dossier à la gate de l'état courant (Gate 1 depuis GAP_ANALYSIS, Gate 2 depuis PROPOSAL_DRAFT)."""
     settings, repo = _context(project_id)
     _require_project(repo)
+    state = repo.load_project().state
     try:
-        submission = submit_gate_1(repo, settings, actor=getpass.getuser())
+        if state == ResearchState.PROPOSAL_DRAFT:
+            submission = submit_gate_2(repo, actor=getpass.getuser())
+        else:
+            submission = submit_gate_1(repo, settings, actor=getpass.getuser())
     except GateError as exc:
         _fail(f"Soumission refusée : {exc}")
-    typer.echo(f"{project_id} : soumis à la Gate 1 (tour {submission.round}, gap check {submission.check_status})")
+    check = "proposal check" if submission.gate == Gate.GATE_2 else "gap check"
+    typer.echo(f"{project_id} : soumis à la {_label(submission.gate)} (tour {submission.round}, {check} {submission.check_status})")
     typer.echo(f"Décision humaine : `research-lab gate status {project_id}`, puis `gate approve` ou `gate revise`")
 
 
-@gate_app.command("status")
-def gate_status(project_id: ProjectId, as_json: JsonFlag = False) -> None:
-    """Dossier soumis à la Gate 1 : gaps classés, contrôles, intégrité des livrables, décisions passées."""
-    _, repo = _context(project_id)
-    _require_project(repo)
-    rounds = repo.gate_export(Gate.GATE_1)
-    submission = latest_submission(repo)
-    modified = modified_artifacts(repo, submission) if submission else []
-    ranking = [r for r in repo.alignment_export() if submission and r["gap_id"] in submission.gap_versions]
-    if as_json:
-        _print_json({"state": repo.load_project().state, "rounds": rounds, "ranking": ranking,
-                     "modified_artifacts": modified})
-        return
-    typer.echo(f"État : {repo.load_project().state}")
-    if submission is None:
-        typer.echo("Aucune soumission à la Gate 1")
-        return
-    typer.echo(f"Tour {submission.round}, soumis le {submission.submitted_at:%Y-%m-%d %H:%M}Z par {submission.actor}")
-    typer.echo(f"gap check à la soumission : {submission.check_status}")
-    for w in submission.check_warnings:
-        typer.echo(f"  avertissement : {w}")
+def _label(gate: Gate) -> str:
+    return "Gate 1" if gate == Gate.GATE_1 else "Gate 2"
+
+
+def _gate_1_dossier(repo: ProjectRepository, submission: GateSubmission) -> None:
     typer.echo("Gaps soumis (par priorité) :")
+    ranking = [r for r in repo.alignment_export() if r["gap_id"] in submission.gap_versions]
     for r in ranking:
         priority = "non évalué" if r["priority_score"] is None else f"priorité {r['priority_score']:.2f}"
         typer.echo(f"  {r['rank']:>2}. {r['gap_id']}  {r['status']:<9}  {r['evidence_strength']:<6}  {priority}  {r['title'][:70]}")
     typer.echo("Détail : gaps.json, alignment.json, literature-review.md ; `gap show <projet> GAP-xxx`")
+
+
+def _gate_2_dossier(repo: ProjectRepository) -> None:
+    for row in repo.solutions_export():
+        if row["question_status"] != "active":
+            continue
+        recommendation = (row["comparison"] or {}).get("recommendation") or "aucune recommandation"
+        typer.echo(f"{row['question_id']}  {row['question'][:80]}")
+        for s in row["solutions"]:
+            if s["status"] == "proposed":
+                typer.echo(f"    {s['solution_id']}  {s['title'][:70]}{'  (recommandée)' if s['solution_id'] == recommendation else ''}")
+    reviews = repo.critique_export()
+    if reviews:
+        last = reviews[-1]
+        typer.echo(f"Revue critique : {len(reviews)} tour(s), dernier verdict {last['verdict']}")
+        for o in last["objections"]:
+            answer = o["response"]["action"] if o["response"] else "sans réponse"
+            typer.echo(f"    {o['objection_id']}  {o['severity']:<8}  {o['statement'][:60]}  → {answer}")
+    typer.echo("À lire : research-proposal.md (et references.bib) ; détail : solutions.json, scientific-review.json")
+
+
+@gate_app.command("status")
+def gate_status(project_id: ProjectId, as_json: JsonFlag = False) -> None:
+    """Dossier soumis à la dernière gate : contenu, contrôles, intégrité des livrables, décisions passées."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    state = repo.load_project().state
+    gate = current_gate(repo)
+    submission = latest_submission(repo, gate) if gate else None
+    if as_json:
+        _print_json({
+            "state": state, "gate": gate, "rounds": repo.gate_export(gate) if gate else [],
+            "ranking": [r for r in repo.alignment_export() if submission and r["gap_id"] in submission.gap_versions],
+            "modified_artifacts": modified_artifacts(repo, submission) if submission else [],
+        })
+        return
+    typer.echo(f"État : {state}")
+    if submission is None:
+        typer.echo("Aucune soumission à une gate")
+        return
+    typer.echo(f"{_label(submission.gate)}, tour {submission.round}, soumis le {submission.submitted_at:%Y-%m-%d %H:%M}Z par {submission.actor}")
+    typer.echo(f"{'proposal' if submission.gate == Gate.GATE_2 else 'gap'} check à la soumission : {submission.check_status}")
+    for w in submission.check_warnings:
+        typer.echo(f"  avertissement : {w}")
+    if submission.gate == Gate.GATE_1:
+        _gate_1_dossier(repo, submission)
+    else:
+        _gate_2_dossier(repo)
+    modified = modified_artifacts(repo, submission)
     typer.echo(f"Livrables : {'modifiés depuis la soumission : ' + ', '.join(modified) if modified else 'inchangés'}")
-    for item in rounds:
+    for item in repo.gate_export(submission.gate):
         if (d := item["decision"]) is not None:
             gaps = f" — {', '.join(d['selected_gaps'])}" if d["selected_gaps"] else ""
             typer.echo(f"Tour {item['round']} : {d['decision']} par {d['approver']}{gaps} — « {d['comment']} »")
@@ -677,16 +745,17 @@ def gate_status(project_id: ProjectId, as_json: JsonFlag = False) -> None:
 
 @gate_app.command("verify")
 def gate_verify(project_id: ProjectId) -> None:
-    """Vérifie que les livrables soumis à la Gate 1 n'ont pas changé depuis (code 2 sinon)."""
+    """Vérifie que les livrables soumis à la dernière gate n'ont pas changé depuis (code 2 sinon)."""
     _, repo = _context(project_id)
     _require_project(repo)
-    submission = latest_submission(repo)
-    if submission is None:
-        _fail("Aucune soumission à la Gate 1")
+    gate = current_gate(repo)
+    if gate is None:
+        _fail("Aucune soumission à une gate")
+    submission = latest_submission(repo, gate)
     if modified := modified_artifacts(repo, submission):
-        typer.echo(f"Modifiés depuis la soumission du tour {submission.round} : {', '.join(modified)}")
+        typer.echo(f"{_label(gate)} : modifiés depuis la soumission du tour {submission.round} : {', '.join(modified)}")
         raise typer.Exit(2)
-    typer.echo(f"Livrables identiques à la soumission du tour {submission.round}")
+    typer.echo(f"{_label(gate)} : livrables identiques à la soumission du tour {submission.round}")
 
 
 def _human_decision(project_id: str, decision: GateDecisionType, comment: str, gaps: list[str]) -> None:
@@ -694,32 +763,38 @@ def _human_decision(project_id: str, decision: GateDecisionType, comment: str, g
     _require_project(repo)
     if reason := human_check_failure():
         _fail(f"Décision refusée : {reason}")
-    submission = latest_submission(repo)
-    if submission is not None and decision == GateDecisionType.APPROVE:
+    state = repo.load_project().state
+    gate = Gate.GATE_2 if state == ResearchState.AWAITING_GATE_2 else Gate.GATE_1
+    if gate == Gate.GATE_2 and gaps:
+        _fail("La Gate 2 porte sur le Research Proposal : pas d'option --gap")
+    if gate == Gate.GATE_1 and decision == GateDecisionType.APPROVE:
         current = {g.gap_id: g for g in repo.load_gaps()}
         for gap_id in gaps:
             if gap := current.get(gap_id):
                 flag = "  (candidate : insuffisamment établi)" if gap.status == "candidate" else ""
                 typer.echo(f"  retenu : {gap_id} v{gap.version} — {gap.title}{flag}")
-    target = "PROBLEM_FORMULATION" if decision == GateDecisionType.APPROVE else "LITERATURE_SEARCH"
-    typer.echo(f"Décision : {decision} → {target}\nCommentaire : {comment}")
+    target = DECISION_TARGETS[gate][decision]
+    typer.echo(f"{_label(gate)} — décision : {decision} → {target}\nCommentaire : {comment}")
     if typer.prompt(f"Pour confirmer, tapez l'identifiant du projet ({project_id})") != project_id:
         _fail("Confirmation incorrecte : rien n'a été enregistré")
     try:
-        record = decide_gate_1(repo, decision, comment, approver=getpass.getuser(), selected_gaps=gaps)
+        if gate == Gate.GATE_2:
+            record = decide_gate_2(repo, decision, comment, approver=getpass.getuser())
+        else:
+            record = decide_gate_1(repo, decision, comment, approver=getpass.getuser(), selected_gaps=gaps)
     except GateError as exc:
         _fail(f"Décision refusée : {exc}")
-    typer.echo(f"Gate 1, tour {record.round} : {record.decision} enregistré par {record.approver} (gate-1.json)")
+    typer.echo(f"{_label(gate)}, tour {record.round} : {record.decision} enregistré par {record.approver} (gate-{gate[-1]}.json)")
 
 
 @gate_app.command("approve")
 def gate_approve(
     project_id: ProjectId,
-    gap: Annotated[list[str], typer.Option("--gap", help="Gap retenu (répéter l'option pour plusieurs)")],
-    comment: Annotated[str, typer.Option(help="Justification du choix")],
+    comment: Annotated[str, typer.Option(help="Justification de la décision")],
+    gap: Annotated[list[str] | None, typer.Option("--gap", help="Gate 1 : gap retenu (répéter l'option)")] = None,
 ) -> None:
-    """[HUMAIN] Approuve la problématique : les gaps retenus passent à la formulation du problème."""
-    _human_decision(project_id, GateDecisionType.APPROVE, comment, gap)
+    """[HUMAIN] Gate 1 : retient des gaps (--gap) pour la formulation du problème. Gate 2 : accepte le Proposal."""
+    _human_decision(project_id, GateDecisionType.APPROVE, comment, gap or [])
 
 
 @gate_app.command("revise")
@@ -727,8 +802,358 @@ def gate_revise(
     project_id: ProjectId,
     comment: Annotated[str, typer.Option(help="Ce qu'il faut chercher ou corriger (lu par l'agent)")],
 ) -> None:
-    """[HUMAIN] Demande une révision : retour à la recherche bibliographique, travail existant conservé."""
+    """[HUMAIN] Demande une révision : Gate 1 → recherche bibliographique, Gate 2 → conception des solutions."""
     _human_decision(project_id, GateDecisionType.REVISE, comment, [])
+
+
+# --- question ------------------------------------------------------------------
+
+
+@question_app.command("add")
+def question_add(
+    project_id: ProjectId,
+    file: DraftFile,
+    reason: Annotated[str, typer.Option(help="Origine de la question (facultatif)")] = "",
+    as_json: JsonFlag = False,
+) -> None:
+    """Enregistre une question de recherche (RQ-xxx) et ses hypothèses à partir d'un brouillon JSON."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    draft = _read_draft(QuestionDraft, file)
+    try:
+        question = add_question(repo, draft, reason, actor=getpass.getuser())
+    except QuestionError as exc:
+        _fail(f"Question refusée : {exc}")
+    if as_json:
+        _print_json(question.model_dump(mode="json"))
+    else:
+        typer.echo(f"{question.question_id} enregistrée ({len(question.hypotheses)} hypothèses, {', '.join(question.gap_ids)})")
+
+
+@question_app.command("revise")
+def question_revise(
+    project_id: ProjectId,
+    question_id: Annotated[str, typer.Argument()],
+    file: DraftFile,
+    reason: Annotated[str, typer.Option(help="Raison de la révision")] = "",
+    as_json: JsonFlag = False,
+) -> None:
+    """Remplace le contenu d'une question par une nouvelle version (l'historique est conservé)."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    draft = _read_draft(QuestionDraft, file)
+    try:
+        question = revise_question(repo, question_id, draft, reason, actor=getpass.getuser())
+    except QuestionError as exc:
+        _fail(f"Révision refusée : {exc}")
+    if as_json:
+        _print_json(question.model_dump(mode="json"))
+    else:
+        typer.echo(f"{question.question_id} version {question.version} ({question.status})")
+
+
+@question_app.command("list")
+def question_list(project_id: ProjectId, as_json: JsonFlag = False) -> None:
+    """Liste les questions de recherche du projet (version courante)."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    questions = repo.questions_export()
+    if as_json:
+        _print_json(questions)
+        return
+    for q in questions:
+        typer.echo(
+            f"{q['question_id']}  v{q['version']}  {q['status']:<9}  {','.join(q['gap_ids']):<16}  "
+            f"{len(q['hypotheses'])} hyp.  {q['question'][:70]}"
+        )
+    typer.echo(f"{len(questions)} questions ; gaps retenus à la Gate 1 : {', '.join(repo.approved_gaps()) or 'aucun'}")
+
+
+@question_app.command("show")
+def question_show(
+    project_id: ProjectId,
+    question_id: Annotated[str, typer.Argument()],
+    history: Annotated[bool, typer.Option(help="Toutes les versions")] = False,
+) -> None:
+    """Affiche une question (JSON). Les champs du brouillon peuvent être repris pour `question revise`."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    if history:
+        versions = repo.question_history(question_id)
+        if not versions:
+            _fail(f"{question_id} n'existe pas dans le projet {project_id}")
+        _print_json([v.model_dump(mode="json") for v in versions])
+        return
+    question = next((q for q in repo.questions_export() if q["question_id"] == question_id), None)
+    if question is None:
+        _fail(f"{question_id} n'existe pas dans le projet {project_id}")
+    _print_json(question)
+
+
+@question_app.command("check")
+def question_check(project_id: ProjectId, as_json: JsonFlag = False) -> None:
+    """Contrôle les questions et hypothèses avant la conception des solutions : OK ou BLOCKED."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    result = check_questions(repo)
+    if as_json:
+        _print_json({"status": result.status, "errors": result.errors, "warnings": result.warnings})
+    else:
+        typer.echo(f"Statut : {result.status}")
+        for e in result.errors:
+            typer.echo(f"  erreur : {e}")
+        for w in result.warnings:
+            typer.echo(f"  avertissement : {w}")
+    if result.status == "BLOCKED":
+        raise typer.Exit(2)
+
+
+# --- solution ------------------------------------------------------------------
+
+
+@solution_app.command("add")
+def solution_add(
+    project_id: ProjectId,
+    file: DraftFile,
+    reason: Annotated[str, typer.Option(help="Origine de la solution (facultatif)")] = "",
+    as_json: JsonFlag = False,
+) -> None:
+    """Enregistre une solution (SOL-xxx) pour une question de recherche, à partir d'un brouillon JSON."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    draft = _read_draft(SolutionDraft, file)
+    try:
+        solution = add_solution(repo, draft, reason, actor=getpass.getuser())
+    except SolutionError as exc:
+        _fail(f"Solution refusée : {exc}")
+    if as_json:
+        _print_json(solution.model_dump(mode="json"))
+    else:
+        typer.echo(f"{solution.solution_id} enregistrée pour {solution.question_id} ({', '.join(solution.addressed_hypotheses)})")
+
+
+@solution_app.command("revise")
+def solution_revise(
+    project_id: ProjectId,
+    solution_id: Annotated[str, typer.Argument()],
+    file: DraftFile,
+    reason: Annotated[str, typer.Option(help="Raison de la révision")] = "",
+    as_json: JsonFlag = False,
+) -> None:
+    """Remplace le contenu d'une solution par une nouvelle version (la comparaison devient périmée)."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    draft = _read_draft(SolutionDraft, file)
+    try:
+        solution = revise_solution(repo, solution_id, draft, reason, actor=getpass.getuser())
+    except SolutionError as exc:
+        _fail(f"Révision refusée : {exc}")
+    if as_json:
+        _print_json(solution.model_dump(mode="json"))
+    else:
+        typer.echo(f"{solution.solution_id} version {solution.version} ({solution.status})")
+
+
+@solution_app.command("compare")
+def solution_compare(project_id: ProjectId, file: DraftFile, as_json: JsonFlag = False) -> None:
+    """Enregistre la comparaison des solutions actives d'une question, critère par critère."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    draft = _read_draft(ComparisonDraft, file)
+    try:
+        comparison = set_comparison(repo, draft, actor=getpass.getuser())
+    except SolutionError as exc:
+        _fail(f"Comparaison refusée : {exc}")
+    if as_json:
+        _print_json(comparison.model_dump(mode="json"))
+    else:
+        recommendation = comparison.recommendation or "aucune recommandation"
+        typer.echo(
+            f"{comparison.question_id} : comparaison v{comparison.version} de {len(comparison.assessments)} solutions "
+            f"sur {len(comparison.criteria)} critères ({recommendation})"
+        )
+
+
+@solution_app.command("list")
+def solution_list(project_id: ProjectId, as_json: JsonFlag = False) -> None:
+    """Liste les solutions par question, avec l'état de leur comparaison."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    rows = repo.solutions_export()
+    if as_json:
+        _print_json(rows)
+        return
+    for row in rows:
+        if row["comparison"] is None:
+            compared = "non comparées"
+        else:
+            compared = "comparaison périmée" if row["comparison_stale"] else f"comparées (v{row['comparison']['version']})"
+        typer.echo(f"{row['question_id']}  {compared}  {row['question'][:70]}")
+        for s in row["solutions"]:
+            mark = "  *" if row["comparison"] and row["comparison"]["recommendation"] == s["solution_id"] else ""
+            typer.echo(f"  {s['solution_id']}  v{s['version']}  {s['status']:<9}  {','.join(s['addressed_hypotheses']):<8}  {s['title'][:60]}{mark}")
+
+
+@solution_app.command("show")
+def solution_show(
+    project_id: ProjectId,
+    solution_id: Annotated[str, typer.Argument()],
+    history: Annotated[bool, typer.Option(help="Toutes les versions")] = False,
+) -> None:
+    """Affiche une solution (JSON). Les champs du brouillon peuvent être repris pour `solution revise`."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    if history:
+        versions = repo.solution_history(solution_id)
+        if not versions:
+            _fail(f"{solution_id} n'existe pas dans le projet {project_id}")
+        _print_json([v.model_dump(mode="json") for v in versions])
+        return
+    solution = next(
+        (s for row in repo.solutions_export() for s in row["solutions"] if s["solution_id"] == solution_id), None
+    )
+    if solution is None:
+        _fail(f"{solution_id} n'existe pas dans le projet {project_id}")
+    _print_json(solution)
+
+
+@solution_app.command("check")
+def solution_check(project_id: ProjectId, as_json: JsonFlag = False) -> None:
+    """Contrôle les solutions et leurs comparaisons avant la revue critique : OK ou BLOCKED."""
+    settings, repo = _context(project_id)
+    _require_project(repo)
+    result = check_solutions(repo, settings)
+    if as_json:
+        _print_json({"status": result.status, "errors": result.errors, "warnings": result.warnings})
+    else:
+        typer.echo(f"Statut : {result.status}")
+        for e in result.errors:
+            typer.echo(f"  erreur : {e}")
+        for w in result.warnings:
+            typer.echo(f"  avertissement : {w}")
+    if result.status == "BLOCKED":
+        raise typer.Exit(2)
+
+
+# --- critique ------------------------------------------------------------------
+
+
+@critique_app.command("submit")
+def critique_submit(
+    project_id: ProjectId,
+    file: DraftFile,
+    reviewer: Annotated[str, typer.Option(help="Auteur de la revue")] = "scientific-reviewer",
+    as_json: JsonFlag = False,
+) -> None:
+    """[REVIEWER] Enregistre la revue du tour en cours (immuable) ; les preuves relues sont revérifiées."""
+    settings, repo = _context(project_id)
+    _require_project(repo)
+    draft = _read_draft(ReviewDraft, file)
+    try:
+        review = submit_review(repo, settings, draft, reviewer=reviewer)
+    except CritiqueError as exc:
+        _fail(f"Revue refusée : {exc}")
+    if as_json:
+        _print_json(review.model_dump(mode="json"))
+        return
+    counts = {s: sum(o.severity == s for o in review.objections) for s in ("critical", "major", "minor")}
+    typer.echo(
+        f"Revue du tour {review.round} : {review.verdict} ({counts['critical']} critiques, {counts['major']} majeures, "
+        f"{counts['minor']} mineures ; {len(review.verifications)} preuves relues)"
+    )
+
+
+@critique_app.command("respond")
+def critique_respond(
+    project_id: ProjectId,
+    objection_id: Annotated[str, typer.Argument()],
+    action: Annotated[ResponseAction, typer.Option(help="revised, rebutted ou accepted_limitation")],
+    response: Annotated[str, typer.Option(help="Réponse argumentée (ce qui a changé, ou pourquoi l'objection est contestée)")],
+) -> None:
+    """Répond à une objection de la revue ; une nouvelle réponse remplace la précédente."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    try:
+        draft = ResponseDraft(action=action, response=response)
+        recorded = respond(repo, objection_id, draft, actor=getpass.getuser())
+    except ValidationError as exc:
+        _fail(f"Réponse invalide :\n{exc}")
+    except CritiqueError as exc:
+        _fail(f"Réponse refusée : {exc}")
+    typer.echo(f"{recorded.objection_id} : {recorded.action}")
+
+
+@critique_app.command("show")
+def critique_show(project_id: ProjectId, as_json: JsonFlag = False) -> None:
+    """Revues du projet, objections et réponses."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    rounds = repo.critique_export()
+    if as_json:
+        _print_json(rounds)
+        return
+    if not rounds:
+        typer.echo("Aucune revue")
+    for review in rounds:
+        typer.echo(f"Tour {review['round']} : {review['verdict']} par {review['reviewer']} — {review['summary'][:100]}")
+        for o in review["objections"]:
+            answer = f"→ {o['response']['action']}" if o["response"] else "→ sans réponse"
+            typer.echo(f"  {o['objection_id']}  {o['severity']:<8}  {','.join(o['targets']):<20}  {o['statement'][:60]}  {answer}")
+        results = [f"{v['evidence_id']} {v['result']}" for v in review["verifications"]]
+        typer.echo(f"  preuves relues : {', '.join(results)}")
+
+
+@critique_app.command("check")
+def critique_check(project_id: ProjectId, as_json: JsonFlag = False) -> None:
+    """Où en est la revue : verdict du tour, objections sans réponse, étape suivante (code 2 si bloqué)."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    result = check_critique(repo)
+    if as_json:
+        _print_json({"status": result.status, "round": result.round, "verdict": result.verdict,
+                     "next_state": result.next_state, "errors": result.errors})
+    else:
+        typer.echo(f"Statut : {result.status} (tour {result.round}, dernier verdict : {result.verdict or 'aucun'})")
+        if result.next_state:
+            typer.echo(f"Étape suivante : {result.next_state}")
+        for e in result.errors:
+            typer.echo(f"  erreur : {e}")
+    if result.status == "BLOCKED":
+        raise typer.Exit(2)
+
+
+# --- proposal ------------------------------------------------------------------
+
+
+@proposal_app.command("references")
+def proposal_references(project_id: ProjectId) -> None:
+    """Génère references.bib depuis la base, pour les publications citées par research-proposal.md."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    try:
+        count = write_references(repo)
+    except ProposalError as exc:
+        _fail(f"Bibliographie refusée : {exc}")
+    typer.echo(f"references.bib : {count} entrées")
+
+
+@proposal_app.command("check")
+def proposal_check(project_id: ProjectId, as_json: JsonFlag = False) -> None:
+    """Contrôle research-proposal.md : sections, citations, éléments traités, bibliographie (OK ou BLOCKED)."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    result = check_proposal_file(repo)
+    if as_json:
+        _print_json({"status": result.status, "errors": result.errors, "warnings": result.warnings,
+                     "cited_papers": result.cited_papers})
+    else:
+        typer.echo(f"Statut : {result.status} ({len(result.cited_papers)} publications citées)")
+        for e in result.errors:
+            typer.echo(f"  erreur : {e}")
+        for w in result.warnings:
+            typer.echo(f"  avertissement : {w}")
+    if result.status == "BLOCKED":
+        raise typer.Exit(2)
 
 
 # --- db ----------------------------------------------------------------------

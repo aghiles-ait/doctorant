@@ -99,7 +99,7 @@ valeur reçoit un score justifié, avec les compromis entre valeurs. La priorit�
 alignement avec la force des preuves (`config/scoring.yaml`). Réviser un gap ou modifier les
 valeurs rend son évaluation périmée.
 
-### Gate 1 : validation humaine
+### Gates : validations humaines
 
 ```bash
 $L gate submit decentralized-ai-governance    # l'agent soumet (refusé si `gap check` est BLOCKED)
@@ -107,20 +107,117 @@ $L gate status decentralized-ai-governance    # dossier : gaps classés, contrô
 $L gate verify decentralized-ai-governance    # livrables inchangés depuis la soumission ?
 
 # Décision : toi seul, dans ton propre terminal (refusée depuis Claude Code ou sans terminal)
-$L gate approve decentralized-ai-governance --gap GAP-001 --gap GAP-003 --comment "…"   # → PROBLEM_FORMULATION
-$L gate revise decentralized-ai-governance --comment "Chercher aussi …"                  # → LITERATURE_SEARCH
+$L gate approve decentralized-ai-governance --gap GAP-001 --gap GAP-003 --comment "…"   # Gate 1 → PROBLEM_FORMULATION
+$L gate revise decentralized-ai-governance --comment "Chercher aussi …"                  # Gate 1 → LITERATURE_SEARCH
+$L gate approve decentralized-ai-governance --comment "…"                                # Gate 2 → COMPLETED
+$L gate revise decentralized-ai-governance --comment "Comparer aussi …"                  # Gate 2 → SOLUTION_DESIGN
 ```
 
-La soumission fige les empreintes de `scope.md`, `literature-review.md`, `evidence-matrix.json`,
-`gaps.json` et `alignment.json`, ainsi que la version de chaque gap. Une approbation est refusée
+Les mêmes commandes servent aux deux gates : `gate submit` soumet à la Gate 1 depuis
+`GAP_ANALYSIS` et à la Gate 2 depuis `PROPOSAL_DRAFT` ; `approve` et `revise` s'appliquent à la
+gate en attente ; `status` et `verify` portent sur la dernière soumission. `--gap` n'existe qu'à la
+Gate 1 (choix des gaps).
+
+**Gate 1.** La soumission fige les empreintes de `scope.md`, `literature-review.md`,
+`evidence-matrix.json`, `gaps.json` et `alignment.json`, ainsi que la version de chaque gap. Une approbation est refusée
 si l'un de ces fichiers a changé depuis. La décision demande de retaper l'identifiant du projet,
 puis elle est enregistrée de façon immuable avec ton identifiant système et la date, et exportée
 dans `gate-1.json`. Une révision conserve le corpus, les preuves et les gaps ; ton commentaire
 indique à l'agent quoi chercher, puis le projet est soumis à nouveau (tour 2, 3…).
 
+**Gate 2.** La soumission exige `proposal check` OK et fige `research-proposal.md`,
+`references.bib`, `research-questions.json`, `solutions.json` et `scientific-review.json`, ainsi que
+les versions des questions et solutions. `approve` termine le projet (`COMPLETED`) ; `revise`
+renvoie à `SOLUTION_DESIGN`, ouvre une nouvelle série de tours de revue, et le Proposal est
+resoumis (tour 2…). Export : `gate-2.json`.
+
 Limite : le contrôle (variable `CLAUDECODE` absente, terminal interactif, règles `deny` de
 `.claude/settings.json`) empêche l'agent d'approuver en suivant son workflow ; ce n'est pas une
 authentification forte. Un programme ayant accès au shell pourrait le contourner délibérément.
+
+### Questions de recherche et hypothèses
+
+```bash
+# brouillon JSON écrit par l'agent (champs : voir .claude/skills/problem-formulation/SKILL.md)
+$L question add decentralized-ai-governance --file research/projects/decentralized-ai-governance/drafts/question.json
+$L question revise decentralized-ai-governance RQ-001 --file … --reason "…"   # nouvelle version
+$L question list decentralized-ai-governance
+$L question show decentralized-ai-governance RQ-001 --history
+$L question check decentralized-ai-governance        # OK ou BLOCKED
+$L project transition decentralized-ai-governance SOLUTION_DESIGN
+```
+
+Une question `RQ-xxx` répond uniquement à des gaps retenus à la Gate 1, et chaque gap retenu doit
+avoir au moins une question active. Chaque hypothèse déclare une prédiction, un critère de
+réfutation distinct de la prédiction, une méthode de test, des métriques et les preuves `EV-xxx`
+qui la motivent. Le code vérifie que ces éléments sont présents et cohérents, pas qu'ils sont
+scientifiquement bons : c'est le rôle du reviewer et de la Gate 2. Livrable :
+`research-questions.json`.
+
+### Solutions
+
+```bash
+# brouillons JSON écrits par l'agent (champs : voir .claude/skills/solution-architect/SKILL.md)
+$L solution add decentralized-ai-governance --file …/drafts/solution-registre.json
+$L solution revise decentralized-ai-governance SOL-001 --file … --reason "…"
+$L solution compare decentralized-ai-governance --file …/drafts/comparison-RQ-001.json
+$L solution list decentralized-ai-governance
+$L solution show decentralized-ai-governance SOL-001 --history
+$L solution check decentralized-ai-governance        # OK ou BLOCKED
+$L project transition decentralized-ai-governance SCIENTIFIC_REVIEW
+```
+
+Une solution `SOL-xxx` répond à une question et décrit son architecture, les hypothèses qu'elle
+permet de tester, son protocole d'évaluation, ses compromis, ses risques et les preuves sur
+lesquelles elle s'appuie. Chaque question doit avoir au moins deux alternatives actives
+(`solution_design.min_solution_alternatives`), comparées sur au moins deux critères. Réviser,
+ajouter ou retirer une solution rend la comparaison périmée. Livrable : `solutions.json`.
+
+### Revue critique indépendante
+
+```bash
+# l'agent scientific-reviewer (lecture seule) enregistre sa revue sur l'entrée standard
+$L critique submit decentralized-ai-governance --file - <<'JSON'
+{"verdict": "MAJOR_REVISION", "summary": "…", "objections": [ … ], "verifications": [ … ]}
+JSON
+$L critique show decentralized-ai-governance       # revues, objections, réponses
+$L critique check decentralized-ai-governance      # verdict du tour, objections sans réponse, étape suivante
+$L critique respond decentralized-ai-governance OBJ-001 --action revised --response "…"   # le doctorant
+$L project transition decentralized-ai-governance PROPOSAL_DRAFT    # verdict ACCEPTABLE
+$L project transition decentralized-ai-governance SOLUTION_DESIGN   # MAJOR_REVISION ou INSUFFICIENT_EVIDENCE
+```
+
+Le reviewer est un agent distinct (`.claude/agents/scientific-reviewer.md`), lancé avec le seul
+identifiant du projet, sans outil d'écriture. Il revoit le raisonnement (gaps retenus, questions,
+hypothèses, solutions), relit lui-même au moins `min_verified_evidence` preuves de ce raisonnement
+et formule des objections `OBJ-xxx` (critique, majeure, mineure). Le code vérifie que les cibles
+existent, revérifie les extraits des preuves relues dans le texte, refuse un verdict `ACCEPTABLE`
+avec une objection critique, et fige les empreintes et versions de ce qui a été revu. Une revue
+par tour, immuable.
+
+Le doctorant répond à chaque objection critique ou majeure : `revised` (accepté seulement si une
+question ou solution visée a une nouvelle version), `rebutted` ou `accepted_limitation`. Les
+questions restent révisables en `SOLUTION_DESIGN` pour répondre aux objections sur les hypothèses.
+Au-delà de `max_review_rounds` tours, il faut en référer à l'humain. Livrable : `scientific-review.json`.
+
+Limite : rien n'authentifie l'auteur d'une revue ; l'indépendance repose sur la séparation des
+agents et leurs consignes.
+
+### Research Proposal
+
+```bash
+cp templates/research-proposal.md research/projects/decentralized-ai-governance/research-proposal.md
+# rédiger en gardant les titres de section ; citer [PAPER-xxx, EV-xxx], GAP-, RQ-, RQ-xxx/Hn, SOL-, OBJ-, SEARCH-
+$L proposal references decentralized-ai-governance   # génère references.bib depuis la base
+$L proposal check decentralized-ai-governance        # OK ou BLOCKED
+```
+
+`proposal check` vérifie les sections du modèle, les citations (publications incluses, preuves
+actives), que chaque gap retenu, question, hypothèse (`RQ-xxx/Hn`), solution active et objection
+critique ou majeure de la dernière revue est traité, que les recherches `SEARCH-xxx` sont citées
+(Q5) et que `references.bib` correspond aux publications citées. `references.bib` est généré à
+partir des métadonnées enregistrées (clé BibTeX = `PAPER-xxx`) et ne s'écrit jamais à la main.
+Le contrôle ne juge pas la qualité de la rédaction : c'est le rôle de la Gate 2.
 
 ## Stockage
 
@@ -194,12 +291,37 @@ de tes données de recherche.
   avec la transition dans une même transaction ; `gate-1.json`, `gate verify`.
 - Les transitions des gates ne passent jamais par `project transition`.
 
+**Sprint 3 — implémenté**
+
+*Questions et hypothèses*
+- Questions `RQ-xxx` versionnées, rattachées aux gaps retenus à la Gate 1, hypothèses falsifiables
+  contrôlées par le code ; `research-questions.json`, `question check`, transition `SOLUTION_DESIGN`.
+  Skill `problem-formulation`, agent `doctorant` étape 6.
+
+*Solutions*
+- Solutions `SOL-xxx` versionnées, au moins deux alternatives par question, comparaison critère par
+  critère figeant les versions comparées ; `solutions.json`, `solution check`, transition
+  `SCIENTIFIC_REVIEW`. Skill `solution-architect`, agent `doctorant` étape 7.
+
+*Revue critique*
+- Agent `scientific-reviewer` (lecture seule) et skill `scientific-critic` : revue immuable par
+  tour, objections `OBJ-xxx`, preuves relues et revérifiées, verdict ; réponses du doctorant
+  contrôlées ; transitions `PROPOSAL_DRAFT` / `SOLUTION_DESIGN` selon le verdict, nombre de tours
+  limité ; `scientific-review.json`, `critique check`.
+
+*Research Proposal*
+- Modèle `templates/research-proposal.md`, `references.bib` généré depuis la base pour les seules
+  publications citées, `proposal check` (sections, citations, couverture du raisonnement, Q5).
+  Skill `research-writer`, agent `doctorant` étape 9.
+
+*Gate 2*
+- Soumission du Proposal (empreintes des livrables, versions des questions et solutions), décision
+  humaine dans un terminal interactif, `approve` → `COMPLETED`, `revise` → `SOLUTION_DESIGN` ;
+  `gate-2.json`. Mêmes commandes `gate` que pour la Gate 1.
+
 **Non implémenté**
 - Connecteurs Semantic Scholar et Crossref ; vérification de l'existence des DOI auprès de Crossref.
 - En `LITERATURE_REVIEW`, plus de nouvelle recherche bibliographique ; en `GAP_ANALYSIS`, seulement
   des recherches contradictoires. Le retour à `LITERATURE_SEARCH` passe par `gate revise`.
-- Pas de décision `reject` à la Gate 1 : `revise` couvre le besoin.
-- Skills `problem-formulation`, `solution-architect`, `scientific-critic`, `research-writer`,
-  agent `scientific-reviewer`, Gate 2, `references.bib` : sprint 3.
-- Templates (`templates/`), suivi des coûts, évaluations : sprints 3 et 4.
-- Transitions au-delà de `PROBLEM_FORMULATION` : refusées explicitement par la CLI.
+- Pas de décision `reject` aux gates : `revise` couvre le besoin.
+- `templates/gap-record.json`, suivi des coûts, évaluations : sprint 4.

@@ -249,6 +249,134 @@ def test_gate_1_flow(project_ready, apis, lab_root, tmp_path, monkeypatch):
     assert verify.exit_code == 2 and "scope.md" in verify.output
 
 
+def test_problem_formulation_flow(project_ready, apis, lab_root, tmp_path, monkeypatch):
+    """Étape 3a : questions et hypothèses sur les gaps retenus, puis passage à la conception des solutions."""
+    test_gate_1_flow(project_ready, apis, lab_root, tmp_path, monkeypatch)  # GAP-001 retenu, PROBLEM_FORMULATION
+
+    assert invoke("question", "check", PROJECT).exit_code == 2  # aucune question
+    hypothesis = {"hypothesis_id": "H1", "statement": "s", "prediction": "p", "refutation_criterion": "r",
+                  "test_method": "m", "metrics": ["taux"], "evidence": ["EV-001"]}
+    question = {"question": "Q ?", "gap_ids": ["GAP-001"], "rationale": "GAP-001", "hypotheses": [hypothesis]}
+    draft = tmp_path / "question.json"
+    draft.write_text(json.dumps(question | {"gap_ids": ["GAP-002"]}))
+    refused = invoke("question", "add", PROJECT, "--file", str(draft))
+    assert refused.exit_code == 1 and "n'a pas été retenu" in refused.output
+    draft.write_text(json.dumps(question | {"hypotheses": [hypothesis | {"refutation_criterion": "P"}]}))
+    assert "répète la prédiction" in invoke("question", "add", PROJECT, "--file", str(draft)).output
+    draft.write_text(json.dumps(question))
+    added = invoke("question", "add", PROJECT, "--file", str(draft))
+    assert added.exit_code == 0 and "RQ-001 enregistrée (1 hypothèses, GAP-001)" in added.output
+
+    assert "gaps retenus à la Gate 1 : GAP-001" in invoke("question", "list", PROJECT).output
+    assert invoke("question", "check", PROJECT).exit_code == 0
+    draft.write_text(json.dumps(question | {"limitations": ["corpus limité"]}))
+    assert "version 2" in invoke("question", "revise", PROJECT, "RQ-001", "--file", str(draft), "--reason", "r").output
+    assert len(json.loads(invoke("question", "show", PROJECT, "RQ-001", "--history").output)) == 2
+    assert json.loads((project_ready / "research-questions.json").read_text())[0]["version"] == 2
+
+    moved = invoke("project", "transition", PROJECT, "SOLUTION_DESIGN")
+    assert moved.exit_code == 0 and "SOLUTION_DESIGN" in moved.output
+
+
+def test_solution_design_flow(project_ready, apis, lab_root, tmp_path, monkeypatch):
+    """Étape 3b : alternatives pour RQ-001, comparaison, puis passage à la revue critique."""
+    test_problem_formulation_flow(project_ready, apis, lab_root, tmp_path, monkeypatch)  # RQ-001 (H1), SOLUTION_DESIGN
+
+    solution = {"title": "A", "question_id": "RQ-001", "summary": "s", "architecture": "a",
+                "addressed_hypotheses": ["H1"], "evaluation_plan": "e", "tradeoffs": ["t"], "risks": ["r"],
+                "evidence": ["EV-001"]}
+    draft = tmp_path / "solution.json"
+    draft.write_text(json.dumps(solution | {"addressed_hypotheses": ["H7"]}))
+    refused = invoke("solution", "add", PROJECT, "--file", str(draft))
+    assert refused.exit_code == 1 and "hypothèses absentes de RQ-001 : H7" in refused.output
+    for title in ("A", "B"):
+        draft.write_text(json.dumps(solution | {"title": title}))
+        assert invoke("solution", "add", PROJECT, "--file", str(draft)).exit_code == 0
+
+    checked = invoke("solution", "check", PROJECT)
+    assert checked.exit_code == 2 and "non comparées" in checked.output
+    criteria = ["coût", "vérifiabilité"]
+    comparison = {"question_id": "RQ-001", "criteria": criteria, "recommendation": None,
+                  "justification": "Le choix dépend du budget : laissé à l'humain.",
+                  "assessments": {s: {c: "…" for c in criteria} for s in ("SOL-001", "SOL-002")}}
+    compare_file = tmp_path / "comparison.json"
+    compare_file.write_text(json.dumps(comparison))
+    compared = invoke("solution", "compare", PROJECT, "--file", str(compare_file))
+    assert compared.exit_code == 0 and "2 solutions sur 2 critères (aucune recommandation)" in compared.output
+    assert "comparées (v1)" in invoke("solution", "list", PROJECT).output
+    assert json.loads(invoke("solution", "show", PROJECT, "SOL-002").output)["title"] == "B"
+
+    moved = invoke("project", "transition", PROJECT, "SCIENTIFIC_REVIEW")
+    assert moved.exit_code == 0 and "SCIENTIFIC_REVIEW" in moved.output
+    assert json.loads((project_ready / "solutions.json").read_text())[0]["comparison_stale"] is False
+
+
+def test_scientific_review_flow(project_ready, apis, lab_root, tmp_path, monkeypatch):
+    """Étape 3c : revue sur l'entrée standard, réponse aux objections, passage à la rédaction."""
+    test_solution_design_flow(project_ready, apis, lab_root, tmp_path, monkeypatch)  # SCIENTIFIC_REVIEW, EV-001
+
+    waiting = invoke("critique", "check", PROJECT)
+    assert waiting.exit_code == 2 and "en attente de la revue" in waiting.output
+    review = {"verdict": "ACCEPTABLE", "summary": "Cohérent.",
+              "objections": [{"severity": "major", "targets": ["SOL-002"], "statement": "s", "rationale": "r"}],
+              "verifications": [{"evidence_id": "EV-001", "result": "supports", "note": "conforme"}]}
+    submitted = runner.invoke(app, ["critique", "submit", PROJECT, "--file", "-"], input=json.dumps(review))
+    assert submitted.exit_code == 0 and "Revue du tour 1 : ACCEPTABLE (0 critiques, 1 majeures" in submitted.output
+    assert "OBJ-001  major" in invoke("critique", "show", PROJECT).output
+
+    assert invoke("project", "transition", PROJECT, "PROPOSAL_DRAFT").exit_code == 1  # objection sans réponse
+    refused = invoke("critique", "respond", PROJECT, "OBJ-001", "--action", "revised", "--response", "x")
+    assert refused.exit_code == 1 and "SOL-002 n'a été révisée" in refused.output
+    answered = invoke("critique", "respond", PROJECT, "OBJ-001", "--action", "accepted_limitation",
+                      "--response", "Limite reportée dans le Proposal.")
+    assert answered.exit_code == 0, answered.output
+    assert "Étape suivante : PROPOSAL_DRAFT" in invoke("critique", "check", PROJECT).output
+    assert invoke("project", "transition", PROJECT, "PROPOSAL_DRAFT").exit_code == 0
+    exported = json.loads((project_ready / "scientific-review.json").read_text())
+    assert exported[0]["objections"][0]["response"]["action"] == "accepted_limitation"
+
+
+def test_proposal_flow(project_ready, apis, lab_root, tmp_path, monkeypatch):
+    """Étape 3d : Research Proposal contrôlé, bibliographie générée depuis la base."""
+    test_scientific_review_flow(project_ready, apis, lab_root, tmp_path, monkeypatch)  # PROPOSAL_DRAFT
+
+    assert "absent ou vide" in invoke("proposal", "check", PROJECT).output
+    sections = {
+        "Résumé": "Sécurité des DAM [EV-001].", "Méthode": "SEARCH-001, SEARCH-002.", "État de l'art": "…",
+        "Gaps retenus": "GAP-001.", "Questions de recherche et hypothèses": "RQ-001, RQ-001/H1.",
+        "Solutions": "SOL-001, SOL-002.", "Protocole d'évaluation": "…", "Revue critique": "OBJ-001.",
+        "Limites": "…", "Références": "references.bib",
+    }
+    (project_ready / "research-proposal.md").write_text("".join(f"## {t}\n\n{b}\n\n" for t, b in sections.items()))
+    checked = invoke("proposal", "check", PROJECT)
+    assert checked.exit_code == 2 and "references.bib absent" in checked.output
+    built = invoke("proposal", "references", PROJECT)
+    assert built.exit_code == 0 and "references.bib : 1 entrées" in built.output
+    checked = invoke("proposal", "check", PROJECT)
+    assert checked.exit_code == 0 and "Statut : OK (1 publications citées)" in checked.output
+
+
+def test_gate_2_flow(project_ready, apis, lab_root, tmp_path, monkeypatch):
+    """Étape 3e : soumission du Proposal, décision humaine, projet terminé."""
+    test_proposal_flow(project_ready, apis, lab_root, tmp_path, monkeypatch)  # PROPOSAL_DRAFT, proposal check OK
+    # (le contrôle « humain dans un terminal » est déjà simulé par test_gate_1_flow)
+
+    assert "Gate 2 : `research-lab gate submit`" in invoke("project", "transition", PROJECT, "AWAITING_GATE_2").output
+    submitted = invoke("gate", "submit", PROJECT)
+    assert submitted.exit_code == 0 and "soumis à la Gate 2 (tour 1, proposal check OK)" in submitted.output
+    status = invoke("gate", "status", PROJECT)
+    assert "Gate 2, tour 1" in status.output and "SOL-001" in status.output and "OBJ-001" in status.output
+    assert "Gate 2 : livrables identiques" in invoke("gate", "verify", PROJECT).output
+
+    with_gap = runner.invoke(app, ["gate", "approve", PROJECT, "--gap", "GAP-001", "--comment", "ok"], input=f"{PROJECT}\n")
+    assert with_gap.exit_code == 1 and "pas d'option --gap" in with_gap.output
+    approved = runner.invoke(app, ["gate", "approve", PROJECT, "--comment", "Proposal accepté"], input=f"{PROJECT}\n")
+    assert approved.exit_code == 0 and "Gate 2, tour 1 : approve" in approved.output, approved.output
+    assert json.loads(invoke("project", "status", PROJECT, "--json").output)["state"] == "COMPLETED"
+    [round_1] = json.loads((project_ready / "gate-2.json").read_text())
+    assert round_1["submission"]["solution_versions"] == {"SOL-001": 1, "SOL-002": 1}
+
+
 def test_corpus_list_and_show(project_ready, apis):
     _search()
     listing = invoke("corpus", "list", PROJECT, "--source", "arxiv")

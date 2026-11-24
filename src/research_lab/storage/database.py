@@ -244,6 +244,158 @@ _MIGRATIONS: list[str] = [
     CREATE TRIGGER gate_decisions_no_delete BEFORE DELETE ON gate_decisions
     BEGIN SELECT RAISE(ABORT, 'une décision de gate est immuable'); END;
     """,
+    # 5 — questions de recherche et hypothèses, versionnées comme les gaps (sprint 3a)
+    """
+    CREATE TABLE research_questions (
+        question_id TEXT PRIMARY KEY,
+        project_id  TEXT NOT NULL REFERENCES projects(project_id),
+        created_at  TEXT NOT NULL
+    );
+
+    CREATE TABLE question_versions (
+        question_id TEXT NOT NULL REFERENCES research_questions(question_id),
+        version     INTEGER NOT NULL CHECK (version >= 1),
+        status      TEXT NOT NULL,
+        record      TEXT NOT NULL,  -- QuestionDraft complet, JSON
+        reason      TEXT NOT NULL CHECK (length(trim(reason)) > 0),
+        actor       TEXT NOT NULL,
+        at          TEXT NOT NULL,
+        PRIMARY KEY (question_id, version)
+    );
+
+    -- Gaps et preuves cités par chaque version : les clés étrangères garantissent qu'ils existent.
+    CREATE TABLE question_gaps (
+        question_id TEXT NOT NULL,
+        version     INTEGER NOT NULL,
+        gap_id      TEXT NOT NULL REFERENCES gaps(gap_id),
+        PRIMARY KEY (question_id, version, gap_id),
+        FOREIGN KEY (question_id, version) REFERENCES question_versions (question_id, version)
+    );
+
+    CREATE TABLE question_evidence (
+        question_id   TEXT NOT NULL,
+        version       INTEGER NOT NULL,
+        hypothesis_id TEXT NOT NULL,
+        evidence_id   TEXT NOT NULL REFERENCES evidence(evidence_id),
+        PRIMARY KEY (question_id, version, hypothesis_id, evidence_id),
+        FOREIGN KEY (question_id, version) REFERENCES question_versions (question_id, version)
+    );
+
+    CREATE TRIGGER research_questions_append_only BEFORE UPDATE ON research_questions
+    BEGIN SELECT RAISE(ABORT, 'une question ne se modifie pas : ajouter une version'); END;
+    CREATE TRIGGER research_questions_no_delete BEFORE DELETE ON research_questions
+    BEGIN SELECT RAISE(ABORT, 'une question ne peut pas être supprimée ; la retirer (statut withdrawn)'); END;
+    CREATE TRIGGER question_versions_append_only BEFORE UPDATE ON question_versions
+    BEGIN SELECT RAISE(ABORT, 'l''historique des questions est en ajout seul'); END;
+    CREATE TRIGGER question_versions_no_delete BEFORE DELETE ON question_versions
+    BEGIN SELECT RAISE(ABORT, 'l''historique des questions est en ajout seul'); END;
+    CREATE TRIGGER question_gaps_append_only BEFORE UPDATE ON question_gaps
+    BEGIN SELECT RAISE(ABORT, 'l''historique des questions est en ajout seul'); END;
+    CREATE TRIGGER question_gaps_no_delete BEFORE DELETE ON question_gaps
+    BEGIN SELECT RAISE(ABORT, 'l''historique des questions est en ajout seul'); END;
+    CREATE TRIGGER question_evidence_append_only BEFORE UPDATE ON question_evidence
+    BEGIN SELECT RAISE(ABORT, 'l''historique des questions est en ajout seul'); END;
+    CREATE TRIGGER question_evidence_no_delete BEFORE DELETE ON question_evidence
+    BEGIN SELECT RAISE(ABORT, 'l''historique des questions est en ajout seul'); END;
+    """,
+    # 6 — solutions versionnées et comparaisons par question (sprint 3b)
+    """
+    CREATE TABLE solutions (
+        solution_id TEXT PRIMARY KEY,
+        project_id  TEXT NOT NULL REFERENCES projects(project_id),
+        question_id TEXT NOT NULL REFERENCES research_questions(question_id),
+        created_at  TEXT NOT NULL
+    );
+
+    CREATE TABLE solution_versions (
+        solution_id TEXT NOT NULL REFERENCES solutions(solution_id),
+        version     INTEGER NOT NULL CHECK (version >= 1),
+        status      TEXT NOT NULL,
+        record      TEXT NOT NULL,  -- SolutionDraft complet, JSON
+        reason      TEXT NOT NULL CHECK (length(trim(reason)) > 0),
+        actor       TEXT NOT NULL,
+        at          TEXT NOT NULL,
+        PRIMARY KEY (solution_id, version)
+    );
+
+    CREATE TABLE solution_evidence (
+        solution_id TEXT NOT NULL,
+        version     INTEGER NOT NULL,
+        evidence_id TEXT NOT NULL REFERENCES evidence(evidence_id),
+        PRIMARY KEY (solution_id, version, evidence_id),
+        FOREIGN KEY (solution_id, version) REFERENCES solution_versions (solution_id, version)
+    );
+
+    -- Comparaison des solutions d'une question ; chaque nouvelle comparaison est une version.
+    CREATE TABLE solution_comparisons (
+        question_id TEXT NOT NULL REFERENCES research_questions(question_id),
+        version     INTEGER NOT NULL CHECK (version >= 1),
+        record      TEXT NOT NULL,  -- Comparison complète, JSON
+        actor       TEXT NOT NULL,
+        at          TEXT NOT NULL,
+        PRIMARY KEY (question_id, version)
+    );
+
+    CREATE TRIGGER solutions_append_only BEFORE UPDATE ON solutions
+    BEGIN SELECT RAISE(ABORT, 'une solution ne se modifie pas : ajouter une version'); END;
+    CREATE TRIGGER solutions_no_delete BEFORE DELETE ON solutions
+    BEGIN SELECT RAISE(ABORT, 'une solution ne peut pas être supprimée ; la retirer (statut withdrawn)'); END;
+    CREATE TRIGGER solution_versions_append_only BEFORE UPDATE ON solution_versions
+    BEGIN SELECT RAISE(ABORT, 'l''historique des solutions est en ajout seul'); END;
+    CREATE TRIGGER solution_versions_no_delete BEFORE DELETE ON solution_versions
+    BEGIN SELECT RAISE(ABORT, 'l''historique des solutions est en ajout seul'); END;
+    CREATE TRIGGER solution_evidence_append_only BEFORE UPDATE ON solution_evidence
+    BEGIN SELECT RAISE(ABORT, 'l''historique des solutions est en ajout seul'); END;
+    CREATE TRIGGER solution_evidence_no_delete BEFORE DELETE ON solution_evidence
+    BEGIN SELECT RAISE(ABORT, 'l''historique des solutions est en ajout seul'); END;
+    CREATE TRIGGER solution_comparisons_append_only BEFORE UPDATE ON solution_comparisons
+    BEGIN SELECT RAISE(ABORT, 'l''historique des comparaisons est en ajout seul'); END;
+    CREATE TRIGGER solution_comparisons_no_delete BEFORE DELETE ON solution_comparisons
+    BEGIN SELECT RAISE(ABORT, 'l''historique des comparaisons est en ajout seul'); END;
+    """,
+    # 7 — revue critique indépendante, objections et réponses (sprint 3c)
+    """
+    -- Une revue par tour (passage à SCIENTIFIC_REVIEW), jamais modifiée.
+    CREATE TABLE scientific_reviews (
+        project_id TEXT NOT NULL REFERENCES projects(project_id),
+        round      INTEGER NOT NULL CHECK (round >= 1),
+        verdict    TEXT NOT NULL CHECK (verdict IN ('ACCEPTABLE', 'MAJOR_REVISION', 'INSUFFICIENT_EVIDENCE')),
+        reviewer   TEXT NOT NULL,
+        at         TEXT NOT NULL,
+        record     TEXT NOT NULL,  -- ScientificReview complète, JSON
+        PRIMARY KEY (project_id, round)
+    );
+
+    CREATE TABLE objections (
+        objection_id TEXT PRIMARY KEY,
+        project_id   TEXT NOT NULL,
+        round        INTEGER NOT NULL,
+        severity     TEXT NOT NULL CHECK (severity IN ('critical', 'major', 'minor')),
+        FOREIGN KEY (project_id, round) REFERENCES scientific_reviews (project_id, round)
+    );
+
+    -- Réponses du doctorant ; la plus récente fait foi, les précédentes sont conservées.
+    CREATE TABLE objection_responses (
+        objection_id TEXT NOT NULL REFERENCES objections(objection_id),
+        action       TEXT NOT NULL CHECK (action IN ('revised', 'rebutted', 'accepted_limitation')),
+        response     TEXT NOT NULL CHECK (length(trim(response)) > 0),
+        actor        TEXT NOT NULL,
+        at           TEXT NOT NULL
+    );
+
+    CREATE TRIGGER scientific_reviews_append_only BEFORE UPDATE ON scientific_reviews
+    BEGIN SELECT RAISE(ABORT, 'une revue est immuable'); END;
+    CREATE TRIGGER scientific_reviews_no_delete BEFORE DELETE ON scientific_reviews
+    BEGIN SELECT RAISE(ABORT, 'une revue est immuable'); END;
+    CREATE TRIGGER objections_append_only BEFORE UPDATE ON objections
+    BEGIN SELECT RAISE(ABORT, 'une objection est immuable'); END;
+    CREATE TRIGGER objections_no_delete BEFORE DELETE ON objections
+    BEGIN SELECT RAISE(ABORT, 'une objection est immuable'); END;
+    CREATE TRIGGER objection_responses_append_only BEFORE UPDATE ON objection_responses
+    BEGIN SELECT RAISE(ABORT, 'l''historique des réponses est en ajout seul'); END;
+    CREATE TRIGGER objection_responses_no_delete BEFORE DELETE ON objection_responses
+    BEGIN SELECT RAISE(ABORT, 'l''historique des réponses est en ajout seul'); END;
+    """,
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)

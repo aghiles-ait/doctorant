@@ -17,6 +17,18 @@ gap_analysis:
   # publications distinctes, et après au moins une recherche contradictoire (Q3).
   min_supporting_papers: 2
 
+solution_design:
+  # Chaque question de recherche doit avoir au moins ce nombre de solutions actives, comparées
+  # entre elles (`solution compare`), avant la revue critique.
+  min_solution_alternatives: 2
+
+scientific_review:
+  # Le reviewer relit au moins ce nombre de preuves du raisonnement (gaps retenus, hypothèses,
+  # solutions), ou toutes s'il y en a moins ; le code revérifie leurs extraits dans le texte.
+  min_verified_evidence: 5
+  # Au-delà, plus de nouveau tour de revue : en référer à l'humain (qui peut relever ce seuil).
+  max_review_rounds: 3
+
 # Règles que l'agent doit respecter (spec §8). Contrôles automatisés à partir du sprint 2.
 scientific_quality:
   never_fabricate_references: true

@@ -52,6 +52,11 @@ class PolicyConfig(BaseModel):
     min_quote_chars: int = Field(default=20, ge=1)
     # Nombre minimal de publications distinctes appuyant un gap pour le déclarer `supported`.
     min_supporting_papers: int = Field(default=2, ge=1)
+    # Nombre minimal de solutions actives, comparées entre elles, pour chaque question de recherche.
+    min_solution_alternatives: int = Field(default=2, ge=2)
+    # Revue critique : preuves du raisonnement que le reviewer doit relire, nombre maximal de tours.
+    min_verified_evidence: int = Field(default=5, ge=1)
+    max_review_rounds: int = Field(default=3, ge=1)
 
 
 class ValueDefinition(BaseModel):
@@ -143,6 +148,8 @@ def load_settings(root: Path | None = None) -> Settings:
             **policy_raw.get("literature_search", {}),
             **policy_raw.get("literature_review", {}),
             **policy_raw.get("gap_analysis", {}),
+            **policy_raw.get("solution_design", {}),
+            **policy_raw.get("scientific_review", {}),
         }
     )
     values = ValuesConfig.model_validate(_load_yaml(root / "config" / "research-values.yaml"))

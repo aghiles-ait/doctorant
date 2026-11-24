@@ -19,14 +19,20 @@ from pydantic import TypeAdapter
 
 from research_lab.config import PolicyConfig
 from research_lab.corpus import check_corpus
+from research_lab.schemas.critique import ObjectionResponse, ScientificReview
 from research_lab.schemas.evidence import Evidence, FulltextRecord, FulltextStatus
 from research_lab.schemas.gap import Alignment, Gap, GapDraft
-from research_lab.schemas.gate import Gate, GateDecision, GateSubmission
+from research_lab.schemas.gate import Gate, GateDecision, GateDecisionType, GateSubmission
 from research_lab.schemas.paper import Paper, PaperStatus, Provenance, ScreeningDecision
 from research_lab.schemas.project import Project, StateChange
+from research_lab.schemas.question import QuestionDraft, ResearchQuestion
+from research_lab.schemas.solution import Comparison, Solution, SolutionDraft
 from research_lab.schemas.search import SearchExecution
 from research_lab.storage.database import Database
 from research_lab.validation.outputs import check_literature_review
+from research_lab.validation.questions import check_problem_formulation
+from research_lab.validation.critique import unanswered_objections
+from research_lab.validation.solutions import check_solution_design
 from research_lab.workflow.state import ResearchState
 from research_lab.workflow.transitions import ProjectFacts, check_transition
 
@@ -38,6 +44,9 @@ _PAPER_ORDER = "CAST(substr(paper_id, 7) AS INTEGER)"
 _SEARCH_ORDER = "CAST(substr(search_id, 8) AS INTEGER)"
 _EVIDENCE_ORDER = "CAST(substr(evidence_id, 4) AS INTEGER)"
 _GAP_ORDER = "CAST(substr(gap_id, 5) AS INTEGER)"
+_QUESTION_ORDER = "CAST(substr(question_id, 4) AS INTEGER)"
+_SOLUTION_ORDER = "CAST(substr(solution_id, 5) AS INTEGER)"
+_OBJECTION_ORDER = "CAST(substr(objection_id, 5) AS INTEGER)"
 
 
 class ProjectNotFound(Exception):
@@ -181,6 +190,26 @@ def next_gap_id(db: Database) -> str:
     return f"GAP-{highest + 1:03d}"
 
 
+def next_question_id(db: Database) -> str:
+    row = db.conn.execute(
+        f"SELECT question_id FROM research_questions ORDER BY {_QUESTION_ORDER} DESC LIMIT 1"
+    ).fetchone()
+    highest = int(row["question_id"].split("-")[1]) if row else 0
+    return f"RQ-{highest + 1:03d}"
+
+
+def next_solution_id(db: Database) -> str:
+    row = db.conn.execute(f"SELECT solution_id FROM solutions ORDER BY {_SOLUTION_ORDER} DESC LIMIT 1").fetchone()
+    highest = int(row["solution_id"].split("-")[1]) if row else 0
+    return f"SOL-{highest + 1:03d}"
+
+
+def next_objection_id(db: Database) -> str:
+    row = db.conn.execute(f"SELECT objection_id FROM objections ORDER BY {_OBJECTION_ORDER} DESC LIMIT 1").fetchone()
+    highest = int(row["objection_id"].split("-")[1]) if row else 0
+    return f"OBJ-{highest + 1:03d}"
+
+
 # --- Texte intégral (partagé entre projets, fichiers dans knowledge/papers/) ----------
 
 
@@ -301,6 +330,15 @@ class ProjectRepository:
         """État vérifiable du projet, sur lequel reposent les préconditions des transitions."""
         papers = self.load_papers()
         evidence = self.load_evidence()
+        questions = self.load_questions()
+        reviews = self.load_reviews()
+        latest_review = reviews[-1] if reviews else None
+        # Une révision demandée à la Gate 2 ouvre une nouvelle série de tours de revue.
+        history = self.load_project().history
+        restarts = [i for i, c in enumerate(history) if c.from_state == ResearchState.AWAITING_GATE_2]
+        since = history[restarts[-1]:] if restarts else history
+        all_rounds = sum(c.to_state == ResearchState.SCIENTIFIC_REVIEW for c in history)
+        review_rounds = sum(c.to_state == ResearchState.SCIENTIFIC_REVIEW for c in since)
         included = [p for p in papers if p.status == PaperStatus.INCLUDED]
         attempted = {r["paper_id"] for r in self.db.conn.execute("SELECT paper_id FROM fulltexts")}
         review_file = self.dir / "literature-review.md"
@@ -313,6 +351,16 @@ class ProjectRepository:
             without_fulltext_attempt=[p.paper_id for p in included if p.paper_id not in attempted],
             active_evidence_count=sum(e.active for e in evidence),
             review_errors=check_literature_review(review_text, papers, evidence).errors,
+            question_errors=check_problem_formulation(questions, self.approved_gaps(), evidence).errors,
+            solution_errors=check_solution_design(
+                questions, self.load_solutions(), self.load_comparisons(), evidence, policy.min_solution_alternatives
+            ).errors,
+            review_rounds=review_rounds,
+            max_review_rounds=policy.max_review_rounds,
+            current_review_verdict=(
+                latest_review.verdict if latest_review and latest_review.round == all_rounds else None
+            ),
+            unanswered_objections=unanswered_objections(latest_review, self.load_responses()),
         )
 
     def transition(self, target: ResearchState, actor: str, policy: PolicyConfig) -> Project:
@@ -506,6 +554,168 @@ class ProjectRepository:
             )
         self.export()
 
+    # --- Questions de recherche -------------------------------------------------------
+
+    def _question_versions(self, where: str, params: tuple) -> list[ResearchQuestion]:
+        rows = self.db.conn.execute(
+            "SELECT q.question_id, q.project_id, q.created_at, v.version, v.record, v.reason, v.actor, v.at "
+            "FROM research_questions q JOIN question_versions v USING (question_id) "
+            f"WHERE {where} ORDER BY {_QUESTION_ORDER}, v.version",
+            params,
+        ).fetchall()
+        return [
+            ResearchQuestion.model_validate({
+                **json.loads(r["record"]), "question_id": r["question_id"], "project_id": r["project_id"],
+                "version": r["version"], "created_at": r["created_at"], "updated_at": r["at"],
+                "actor": r["actor"], "reason": r["reason"],
+            })
+            for r in rows
+        ]
+
+    def load_questions(self) -> list[ResearchQuestion]:
+        """Version courante de chaque question du projet."""
+        return self._question_versions(
+            "q.project_id = ? AND v.version = "
+            "(SELECT MAX(version) FROM question_versions WHERE question_id = q.question_id)",
+            (self.project_id,),
+        )
+
+    def question_history(self, question_id: str) -> list[ResearchQuestion]:
+        return self._question_versions("q.project_id = ? AND q.question_id = ?", (self.project_id, question_id))
+
+    def save_question_version(self, question: ResearchQuestion) -> None:
+        """Enregistre une version de question ; la version 1 crée la question."""
+        draft = QuestionDraft.model_validate(question.model_dump(include=set(QuestionDraft.model_fields)))
+        key = (question.question_id, question.version)
+        with self.db.transaction() as conn:
+            if question.version == 1:
+                conn.execute(
+                    "INSERT INTO research_questions (question_id, project_id, created_at) VALUES (?, ?, ?)",
+                    (question.question_id, self.project_id, question.created_at.isoformat()),
+                )
+            conn.execute(
+                "INSERT INTO question_versions (question_id, version, status, record, reason, actor, at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (*key, question.status, draft.model_dump_json(), question.reason, question.actor,
+                 question.updated_at.isoformat()),
+            )
+            conn.executemany(
+                "INSERT INTO question_gaps (question_id, version, gap_id) VALUES (?, ?, ?)",
+                [(*key, gap_id) for gap_id in question.gap_ids],
+            )
+            conn.executemany(
+                "INSERT INTO question_evidence (question_id, version, hypothesis_id, evidence_id) VALUES (?, ?, ?, ?)",
+                [(*key, h.hypothesis_id, evidence_id) for h in question.hypotheses for evidence_id in h.evidence],
+            )
+        self.export()
+
+    # --- Solutions --------------------------------------------------------------------
+
+    def _solution_versions(self, where: str, params: tuple) -> list[Solution]:
+        rows = self.db.conn.execute(
+            "SELECT s.solution_id, s.project_id, s.created_at, v.version, v.record, v.reason, v.actor, v.at "
+            "FROM solutions s JOIN solution_versions v USING (solution_id) "
+            f"WHERE {where} ORDER BY {_SOLUTION_ORDER}, v.version",
+            params,
+        ).fetchall()
+        return [
+            Solution.model_validate({
+                **json.loads(r["record"]), "solution_id": r["solution_id"], "project_id": r["project_id"],
+                "version": r["version"], "created_at": r["created_at"], "updated_at": r["at"],
+                "actor": r["actor"], "reason": r["reason"],
+            })
+            for r in rows
+        ]
+
+    def load_solutions(self) -> list[Solution]:
+        """Version courante de chaque solution du projet."""
+        return self._solution_versions(
+            "s.project_id = ? AND v.version = "
+            "(SELECT MAX(version) FROM solution_versions WHERE solution_id = s.solution_id)",
+            (self.project_id,),
+        )
+
+    def solution_history(self, solution_id: str) -> list[Solution]:
+        return self._solution_versions("s.project_id = ? AND s.solution_id = ?", (self.project_id, solution_id))
+
+    def save_solution_version(self, solution: Solution) -> None:
+        """Enregistre une version de solution ; la version 1 crée la solution."""
+        draft = SolutionDraft.model_validate(solution.model_dump(include=set(SolutionDraft.model_fields)))
+        key = (solution.solution_id, solution.version)
+        with self.db.transaction() as conn:
+            if solution.version == 1:
+                conn.execute(
+                    "INSERT INTO solutions (solution_id, project_id, question_id, created_at) VALUES (?, ?, ?, ?)",
+                    (solution.solution_id, self.project_id, solution.question_id, solution.created_at.isoformat()),
+                )
+            conn.execute(
+                "INSERT INTO solution_versions (solution_id, version, status, record, reason, actor, at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (*key, solution.status, draft.model_dump_json(), solution.reason, solution.actor,
+                 solution.updated_at.isoformat()),
+            )
+            conn.executemany(
+                "INSERT INTO solution_evidence (solution_id, version, evidence_id) VALUES (?, ?, ?)",
+                [(*key, evidence_id) for evidence_id in solution.evidence],
+            )
+        self.export()
+
+    def load_comparisons(self) -> dict[str, Comparison]:
+        """Dernière comparaison de chaque question du projet."""
+        rows = self.db.conn.execute(
+            "SELECT c.record FROM solution_comparisons c JOIN research_questions q USING (question_id) "
+            "WHERE q.project_id = ? ORDER BY c.version",
+            (self.project_id,),
+        )
+        return {(c := Comparison.model_validate_json(r["record"])).question_id: c for r in rows}
+
+    def add_comparison(self, comparison: Comparison) -> None:
+        with self.db.transaction() as conn:
+            conn.execute(
+                "INSERT INTO solution_comparisons (question_id, version, record, actor, at) VALUES (?, ?, ?, ?, ?)",
+                (comparison.question_id, comparison.version, comparison.model_dump_json(), comparison.actor,
+                 comparison.at.isoformat()),
+            )
+        self.export()
+
+    # --- Revue critique ----------------------------------------------------------------
+
+    def load_reviews(self) -> list[ScientificReview]:
+        rows = self.db.conn.execute(
+            "SELECT record FROM scientific_reviews WHERE project_id = ? ORDER BY round", (self.project_id,)
+        )
+        return [ScientificReview.model_validate_json(r["record"]) for r in rows]
+
+    def record_review(self, review: ScientificReview) -> None:
+        with self.db.transaction() as conn:
+            conn.execute(
+                "INSERT INTO scientific_reviews (project_id, round, verdict, reviewer, at, record) VALUES (?, ?, ?, ?, ?, ?)",
+                (self.project_id, review.round, review.verdict, review.reviewer, review.at.isoformat(),
+                 review.model_dump_json()),
+            )
+            conn.executemany(
+                "INSERT INTO objections (objection_id, project_id, round, severity) VALUES (?, ?, ?, ?)",
+                [(o.objection_id, self.project_id, review.round, o.severity) for o in review.objections],
+            )
+        self.export()
+
+    def load_responses(self) -> dict[str, ObjectionResponse]:
+        """Dernière réponse à chaque objection du projet."""
+        rows = self.db.conn.execute(
+            "SELECT r.objection_id, r.action, r.response, r.actor, r.at FROM objection_responses r "
+            "JOIN objections o USING (objection_id) WHERE o.project_id = ? ORDER BY r.rowid",
+            (self.project_id,),
+        )
+        return {r["objection_id"]: ObjectionResponse.model_validate(dict(r)) for r in rows}
+
+    def add_response(self, response: ObjectionResponse) -> None:
+        with self.db.transaction() as conn:
+            conn.execute(
+                "INSERT INTO objection_responses (objection_id, action, response, actor, at) VALUES (?, ?, ?, ?, ?)",
+                (response.objection_id, response.action, response.response, response.actor, response.at.isoformat()),
+            )
+        self.export()
+
     # --- Gates -----------------------------------------------------------------------
 
     def load_gate_submissions(self, gate: Gate) -> list[GateSubmission]:
@@ -521,6 +731,13 @@ class ProjectRepository:
             (self.project_id, gate),
         )
         return [GateDecision.model_validate_json(r["record"]) for r in rows]
+
+    def approved_gaps(self) -> dict[str, int]:
+        """Gaps retenus par la dernière décision de Gate 1 (gap -> version approuvée), si c'est une approbation."""
+        decisions = self.load_gate_decisions(Gate.GATE_1)
+        if not decisions or decisions[-1].decision != GateDecisionType.APPROVE:
+            return {}
+        return decisions[-1].selected_gaps
 
     def record_gate_submission(self, submission: GateSubmission, change: StateChange) -> None:
         with self.db.transaction() as conn:
@@ -547,7 +764,7 @@ class ProjectRepository:
     # --- Exports lisibles ------------------------------------------------------
 
     def gate_export(self, gate: Gate) -> list[dict]:
-        """gate-1.json : chaque tour de validation, avec son dossier et la décision humaine."""
+        """gate-1.json, gate-2.json : chaque tour de validation, avec son dossier et la décision humaine."""
         decisions = {d.round: d for d in self.load_gate_decisions(gate)}
         return [
             {
@@ -594,6 +811,57 @@ class ProjectRepository:
         rows.sort(key=lambda r: -1 if r["priority_score"] is None else r["priority_score"], reverse=True)
         return [{"rank": rank, **row} for rank, row in enumerate(rows, start=1)]
 
+    def questions_export(self) -> list[dict]:
+        """research-questions.json : version courante de chaque question, avec les publications citées."""
+        evidence = {e.evidence_id: e for e in self.load_evidence()}
+        return [
+            {
+                **question.model_dump(mode="json"),
+                "cited_papers": sorted({
+                    evidence[i].paper_id for h in question.hypotheses for i in h.evidence if i in evidence
+                }),
+            }
+            for question in self.load_questions()
+        ]
+
+    def solutions_export(self) -> list[dict]:
+        """solutions.json : pour chaque question, ses solutions et leur comparaison."""
+        evidence = {e.evidence_id: e for e in self.load_evidence()}
+        solutions = self.load_solutions()
+        comparisons = self.load_comparisons()
+        rows = []
+        for question in self.load_questions():
+            own = [s for s in solutions if s.question_id == question.question_id]
+            if not question.active and not own:
+                continue
+            comparison = comparisons.get(question.question_id)
+            compared = {s.solution_id: s.version for s in own if s.active}
+            rows.append({
+                "question_id": question.question_id,
+                "question": question.question,
+                "question_status": question.status,
+                "solutions": [
+                    {**s.model_dump(mode="json"),
+                     "cited_papers": sorted({evidence[i].paper_id for i in s.evidence if i in evidence})}
+                    for s in own
+                ],
+                "comparison": comparison.model_dump(mode="json") if comparison else None,
+                "comparison_stale": comparison.solution_versions != compared if comparison else None,
+            })
+        return rows
+
+    def critique_export(self) -> list[dict]:
+        """scientific-review.json : chaque tour de revue, ses objections et la dernière réponse à chacune."""
+        responses = self.load_responses()
+        rows = []
+        for review in self.load_reviews():
+            data = review.model_dump(mode="json")
+            for objection in data["objections"]:
+                response = responses.get(objection["objection_id"])
+                objection["response"] = response.model_dump(mode="json", exclude={"objection_id"}) if response else None
+            rows.append(data)
+        return rows
+
     def evidence_matrix(self) -> list[dict]:
         """Matrice de preuves : pour chaque publication incluse, ses preuves actives."""
         evidence = [e for e in self.load_evidence() if e.active]
@@ -628,8 +896,19 @@ class ProjectRepository:
         )
         for name, content in (("gaps.json", self.gaps_export()), ("alignment.json", self.alignment_export())):
             _atomic_write(self.dir / name, json.dumps(content, indent=2, ensure_ascii=False) + "\n")
-        if gate_1 := self.gate_export(Gate.GATE_1):
-            _atomic_write(self.dir / "gate-1.json", json.dumps(gate_1, indent=2, ensure_ascii=False) + "\n")
+        for gate, name in ((Gate.GATE_1, "gate-1.json"), (Gate.GATE_2, "gate-2.json")):
+            if rounds := self.gate_export(gate):
+                _atomic_write(self.dir / name, json.dumps(rounds, indent=2, ensure_ascii=False) + "\n")
+        if questions := self.questions_export():
+            _atomic_write(
+                self.dir / "research-questions.json", json.dumps(questions, indent=2, ensure_ascii=False) + "\n"
+            )
+        if self.load_solutions():
+            _atomic_write(
+                self.dir / "solutions.json", json.dumps(self.solutions_export(), indent=2, ensure_ascii=False) + "\n"
+            )
+        if reviews := self.critique_export():
+            _atomic_write(self.dir / "scientific-review.json", json.dumps(reviews, indent=2, ensure_ascii=False) + "\n")
 
 
 # --- Import des projets du sprint 1 (fichiers JSON/YAML) -------------------------
