@@ -1,0 +1,29 @@
+[
+  {
+    "paper_id": "PAPER-001",
+    "title": "Trustworthy Decentralized Autonomous Machines: A New Paradigm in Automation Economy",
+    "year": 2025,
+    "fulltext_status": "available",
+    "reading": {
+      "page_count": 2,
+      "main_pages": 2,
+      "references_from": null,
+      "pages_read": [
+        1,
+        2
+      ],
+      "unread_main_pages": [],
+      "complete": true
+    },
+    "evidence": [
+      {
+        "evidence_id": "EV-001",
+        "claim": "Les DAM étendent l'autonomie au monde physique",
+        "quote": "extend autonomy into the physical world",
+        "location": "full_text",
+        "page": 2,
+        "evidence_type": "position"
+      }
+    ]
+  }
+]

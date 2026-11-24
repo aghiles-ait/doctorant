@@ -15,7 +15,7 @@ from research_lab.schemas.search import SearchQuery
 
 ARXIV_URL = "https://export.arxiv.org/api/query"
 OPENALEX_URL = "https://api.openalex.org"
-NO_RETRY_DELAY = RetryConfig(max_attempts=3, backoff_seconds=0)
+NO_RETRY_DELAY = RetryConfig(max_attempts=3, delays_seconds=[0])
 
 
 def _arxiv(page_size: int = 100) -> ArxivProvider:
@@ -33,6 +33,13 @@ def test_arxiv_query_syntax():
     query = SearchQuery(text='"AI governance" decentralized', date_from=date(2024, 1, 1), date_to=date(2025, 12, 31))
     assert build_search_query(query) == (
         'all:"AI governance" AND all:decentralized AND submittedDate:[202401010000 TO 202512312359]'
+    )
+
+
+def test_arxiv_query_restricted_to_categories():
+    query = SearchQuery(text='DAO "artificial intelligence"')
+    assert build_search_query(query, ["cs.AI", "cs.MA"]) == (
+        '(all:DAO AND all:"artificial intelligence") AND (cat:cs.AI OR cat:cs.MA)'
     )
 
 
@@ -79,6 +86,13 @@ def test_arxiv_paginates_until_max_results(fixture_text):
 def test_openalex_filter():
     query = SearchQuery(text="AI governance, privacy", date_from=date(2024, 1, 1))
     assert build_filter(query) == "title_and_abstract.search:AI governance  privacy,from_publication_date:2024-01-01"
+
+
+def test_openalex_filter_adds_configured_filters():
+    query = SearchQuery(text="DAO", date_to=date(2026, 10, 31))
+    assert build_filter(query, ["primary_topic.field.id:17", "has_abstract:true"]) == (
+        "title_and_abstract.search:DAO,primary_topic.field.id:17,has_abstract:true,to_publication_date:2026-10-31"
+    )
 
 
 def test_rebuild_abstract():
@@ -137,6 +151,33 @@ def test_persistent_errors_raise_after_max_attempts():
     with pytest.raises(ProviderError, match="3 tentatives"):
         _arxiv().search(SearchQuery(text="x"))
     assert route.call_count == 3
+
+
+def test_retry_delays_follow_config_and_retry_after():
+    retry = RetryConfig()
+    assert [retry.delay(a) for a in (1, 2, 3, 4)] == [15, 60, 180, 180]
+    assert retry.delay(1, retry_after=42) == 42
+    assert retry.delay(1, retry_after=3600) == 300  # plafonné
+
+
+@respx.mock
+def test_rate_limit_waits_retry_after_then_configured_delays(fixture_text):
+    waits: list[float] = []
+    respx.get(ARXIV_URL).mock(side_effect=[
+        httpx.Response(429, headers={"Retry-After": "20"}),
+        httpx.Response(429),
+        httpx.Response(200, text=fixture_text("arxiv_search.xml")),
+    ])
+    provider = ArxivProvider(ProviderConfig(base_url=ARXIV_URL), RetryConfig(), sleep=waits.append)
+    assert len(provider.search(SearchQuery(text="x", max_results=2)).hits) == 2
+    assert waits == [20, 60]
+
+
+@respx.mock
+def test_failure_lists_every_attempt():
+    respx.get(ARXIV_URL).mock(side_effect=[httpx.Response(503), httpx.ConnectError("down"), httpx.Response(429)])
+    with pytest.raises(ProviderError, match=r"1\) HTTP 503.*2\) ConnectError: down.*3\) HTTP 429"):
+        _arxiv().search(SearchQuery(text="x"))
 
 
 @respx.mock

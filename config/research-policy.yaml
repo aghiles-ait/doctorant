@@ -6,11 +6,17 @@ literature_search:
   min_corpus_size: 20
   # Autorise l'option --allow-partial (fusion des résultats quand une source échoue).
   allow_partial_search: false
+  # Recherche plafonnée par --max-results : jusqu'à ce nombre de résultats disponibles, `corpus check` exige de
+  # les examiner tous (NEEDS_MORE_RESEARCH) ; au-delà, la requête est trop large : avertissement, à affiner.
+  max_examinable_results: 300
 
 literature_review:
   # Longueur minimale d'un extrait cité comme preuve (lettres et chiffres, hors espaces et ponctuation).
   # Un extrait trop court pourrait être retrouvé par hasard dans le texte.
   min_quote_chars: 20
+  # Une publication incluse dont le texte intégral est disponible doit avoir été affichée par
+  # `fulltext show` sur tout son texte principal (jusqu'aux références) avant de clore l'état de l'art.
+  require_full_reading: true
 
 gap_analysis:
   # Un gap ne passe au statut `supported` qu'appuyé par des preuves d'au moins ce nombre de
@@ -28,6 +34,21 @@ scientific_review:
   min_verified_evidence: 5
   # Au-delà, plus de nouveau tour de revue : en référer à l'humain (qui peut relever ce seuil).
   max_review_rounds: 3
+
+# Évaluation humaine de la qualité scientifique (spec §11) : un humain note les gaps et les hypothèses
+# (`research-lab eval rate`, dans son propre terminal). La nouveauté n'est pas mesurée par un score.
+evaluation:
+  scale: [1, 2, 3, 4, 5]   # 1 : très insuffisant ; 5 : excellent
+  gap_criteria:
+    reality: "Le manque est réel au vu de la littérature citée (pas un artefact du corpus)"
+    evidence: "Les preuves citées soutiennent le gap, preuves contraires comprises"
+    importance: "Combler ce gap ferait progresser le domaine"
+  hypothesis_criteria:
+    falsifiability: "Le critère de réfutation est observable et pourrait réellement être atteint"
+    relevance: "L'hypothèse répond à la question et au gap retenu"
+    testability: "Méthode et métriques permettent de la tester avec des moyens réalistes"
+  # Critère d'acceptation du MVP : revue humaine sur au moins ce nombre de sujets distincts.
+  min_rated_topics: 3
 
 # Règles que l'agent doit respecter (spec §8). Contrôles automatisés à partir du sprint 2.
 scientific_quality:

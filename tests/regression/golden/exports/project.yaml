@@ -1,0 +1,66 @@
+project_id: decentralized-ai-governance
+topic: Decentralized AI governance
+state: COMPLETED
+created_at: '<datetime>'
+updated_at: '<datetime>'
+history:
+- from_state: null
+  to_state: NEW
+  at: '<datetime>'
+  actor: <user>
+  forced: false
+- from_state: NEW
+  to_state: SCOPING
+  at: '<datetime>'
+  actor: <user>
+  forced: false
+- from_state: SCOPING
+  to_state: LITERATURE_SEARCH
+  at: '<datetime>'
+  actor: <user>
+  forced: false
+- from_state: LITERATURE_SEARCH
+  to_state: LITERATURE_REVIEW
+  at: '<datetime>'
+  actor: <user>
+  forced: false
+- from_state: LITERATURE_REVIEW
+  to_state: GAP_ANALYSIS
+  at: '<datetime>'
+  actor: <user>
+  forced: false
+- from_state: GAP_ANALYSIS
+  to_state: AWAITING_GATE_1
+  at: '<datetime>'
+  actor: <user>
+  forced: false
+- from_state: AWAITING_GATE_1
+  to_state: PROBLEM_FORMULATION
+  at: '<datetime>'
+  actor: <user>
+  forced: false
+- from_state: PROBLEM_FORMULATION
+  to_state: SOLUTION_DESIGN
+  at: '<datetime>'
+  actor: <user>
+  forced: false
+- from_state: SOLUTION_DESIGN
+  to_state: SCIENTIFIC_REVIEW
+  at: '<datetime>'
+  actor: <user>
+  forced: false
+- from_state: SCIENTIFIC_REVIEW
+  to_state: PROPOSAL_DRAFT
+  at: '<datetime>'
+  actor: <user>
+  forced: false
+- from_state: PROPOSAL_DRAFT
+  to_state: AWAITING_GATE_2
+  at: '<datetime>'
+  actor: <user>
+  forced: false
+- from_state: AWAITING_GATE_2
+  to_state: COMPLETED
+  at: '<datetime>'
+  actor: <user>
+  forced: false

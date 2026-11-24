@@ -36,8 +36,16 @@ publication est refusée. Ne contourne jamais ce contrôle en reformulant un ext
    `.venv/bin/research-lab fulltext fetch <id>` puis `fulltext status <id>`.
    `unavailable` / `failed` : la publication reste utilisable, mais seulement par son résumé.
 
-4. **Lire et extraire les preuves.** Pour chaque publication incluse :
-   - lire le texte : `.venv/bin/research-lab fulltext show <id> PAPER-xxx` (ou `--page N`) ;
+4. **Lire en entier et extraire les preuves.** Pour chaque publication incluse dont le texte est disponible :
+   - plan du texte : `.venv/bin/research-lab fulltext show <id> PAPER-xxx` (pages, taille, lues ou non,
+     début des références) ;
+   - lire **tout le texte principal**, dans l'ordre, par plages : `fulltext show <id> PAPER-xxx --pages N-M`.
+     Chaque appel affiche au plus 15 000 caractères ; s'il s'arrête avant la fin de la plage, il indique la
+     commande pour la suite. Les pages affichées sont enregistrées : `review check` et la transition vers
+     `GAP_ANALYSIS` refusent une publication dont une page du texte principal (jusqu'au début des
+     références) n'a jamais été affichée. Les annexes et la bibliographie sont facultatives ;
+   - ne lis jamais `knowledge/papers/*.pages.json` directement (ni Read, ni grep) : une page lue ainsi
+     n'est pas enregistrée, et `evidence add --page N` refuse une page jamais affichée par `fulltext show` ;
    - pour chaque apport utile à la question de recherche, enregistrer une preuve :
      ```
      .venv/bin/research-lab evidence add <id> --paper PAPER-xxx --page N --type <type> \
@@ -55,7 +63,8 @@ publication est refusée. Ne contourne jamais ce contrôle en reformulant un ext
 
 5. **Rédiger `research/projects/<id>/literature-review.md`** :
    - **Méthode** (Q5) : bases interrogées, requêtes et dates (`search-log <id>`), critères de tri,
-     nombre de publications trouvées / incluses / exclues, couverture du texte intégral ;
+     nombre de publications trouvées / incluses / exclues, couverture du texte intégral **telle que la
+     calcule `fulltext status <id>`** (ne jamais écrire « lu en texte intégral » pour un texte non lu en entier) ;
    - **Synthèse thématique** : approches, résultats, débats ; chaque affirmation substantielle se termine
      par ses références, par exemple `[PAPER-012, EV-031]` ;
    - **Résultats contradictoires et approches concurrentes** : explicitement, avec leurs preuves ;
@@ -67,7 +76,8 @@ publication est refusée. Ne contourne jamais ce contrôle en reformulant un ext
 
 7. **Clore l'étape** : `.venv/bin/research-lab project transition <id> GAP_ANALYSIS`.
    La transition vérifie : plus aucun candidat, au moins une publication incluse, texte intégral
-   recherché pour toutes les incluses, au moins une preuve, `review check` sans erreur.
+   recherché pour toutes les incluses, texte principal disponible affiché en entier, au moins une preuve,
+   `review check` sans erreur.
 
 ## Output
 
@@ -96,3 +106,4 @@ nombre de preuves par type, résultat de `review check`, principales limites.
 | Texte intégral indisponible pour la plupart des publications | Travailler sur les résumés, le signaler dans la Méthode et les Limites. |
 | Preuve refusée de façon répétée | Ne pas reformuler l'extrait pour « passer » : choisir un autre passage ou renoncer à l'affirmation. |
 | `FulltextTampered` (texte modifié) | `BLOCKED` : s'arrêter et le signaler. |
+| `review check` : « pages du texte principal jamais affichées » | Lire les pages indiquées (`fulltext show … --pages N-M`). Si la publication ne mérite pas une lecture complète, c'est qu'elle n'est pas à inclure : retirer ses preuves et l'exclure avec une raison. |

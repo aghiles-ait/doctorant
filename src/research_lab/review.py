@@ -140,6 +140,11 @@ def add_evidence(
             raise ReviewError(f"{exc} : utiliser une preuve du résumé (sans --page)") from exc
         if not 1 <= page <= len(pages):
             raise ReviewError(f"{paper_id} a {len(pages)} pages ; la page {page} n'existe pas")
+        if page not in repo.pages_read(paper_id, text_sha256):
+            raise ReviewError(
+                f"page {page} de {paper_id} jamais affichée : la lire d'abord "
+                f"(`fulltext show {repo.project_id} {paper_id} --page {page}`)"
+            )
         if not quote_in(quote, pages[page - 1]):
             found = find_quote_pages(quote, pages)
             hint = f" ; il figure page(s) {', '.join(map(str, found))}" if found else " ni ailleurs dans le texte"

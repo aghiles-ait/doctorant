@@ -46,9 +46,9 @@ def human_check_failure() -> str | None:
     commandes, qui ne disposent pas d'un terminal interactif. Ce n'est pas une authentification.
     """
     if os.environ.get("CLAUDECODE"):
-        return "commande lancée depuis Claude Code : une gate est validée par un humain, dans son propre terminal"
+        return "commande lancée depuis Claude Code : une décision humaine se prend dans son propre terminal"
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
-        return "pas de terminal interactif : une gate est validée par un humain, dans son propre terminal"
+        return "pas de terminal interactif : une décision humaine se prend dans son propre terminal"
     return None
 
 

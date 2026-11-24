@@ -75,7 +75,10 @@ The workflow state is enforced by the `research-lab` CLI, not by you. Always use
 (they are regenerated from `knowledge/research.db`).
 
 To resume an interrupted project, start with
-`.venv/bin/research-lab project status <project-id>` and continue from its state:
+`.venv/bin/research-lab project resume <project-id>`: it reads the state from the database and
+reports the current step, the instructions of the last gate decision, what blocks each next
+step, and exports out of date with the database (`--repair` regenerates them). Then continue
+from its state:
 `SCOPING` → step 1, `LITERATURE_SEARCH` → step 2, `LITERATURE_REVIEW` → step 3,
 `GAP_ANALYSIS` → steps 4 and 5 (`gap list` and `gap check` show what remains),
 `AWAITING_GATE_1` or `AWAITING_GATE_2` → wait for the human decision,
@@ -205,7 +208,7 @@ go to Gate 2.
 1. `.venv/bin/research-lab gate submit <project-id>` (refused while `proposal check`
    is `BLOCKED`). This freezes the Proposal, `references.bib`, the questions, the
    solutions and the review: do not edit them afterwards, or the approval will be refused.
-2. Present a decision summary: questions and hypotheses, the solutions and the
+2. Present a decision summary (include `.venv/bin/research-lab eval report <project-id>`): questions and hypotheses, the solutions and the
    comparison's recommendation (labelled as such), the review verdict and how each
    critical or major objection was answered, the main limitations.
 3. Tell the human to decide **in their own terminal**:
@@ -213,6 +216,8 @@ go to Gate 2.
    - `.venv/bin/research-lab gate revise <project-id> --comment "<what to investigate or fix>"`
      (back to `SOLUTION_DESIGN`).
 4. Stop. As for Gate 1, you can never record the decision yourself.
+   The human may also rate the gaps and hypotheses (`research-lab eval rate <project-id>`, in
+   their own terminal); never run it yourself.
 
 ## Evidence rules
 
@@ -226,3 +231,10 @@ go to Gate 2.
   or report it as "found outside the corpus, not verified".
 - If the corpus is too small to support a statement, say so instead of filling
   the gap from memory.
+- Read every included paper's main text in full with `fulltext show <id> PAPER-xxx --pages N-M`
+  (outline first, without `--pages`). Shown pages are recorded; `review check`, `gap check` and the
+  transition to `GAP_ANALYSIS` refuse an included paper whose main text (up to the references) was not
+  entirely shown, and `evidence add --page N` refuses a page never shown. Never read
+  `knowledge/papers/*.pages.json` directly. Never write "read in full" for a paper `fulltext status`
+  does not report as fully read.
+- Keep queries short (2-3 terms): a contradictory search that returns nothing does not count.

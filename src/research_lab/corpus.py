@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from research_lab.schemas.paper import Paper, PaperMetadata, Provenance, SourceHit
-from research_lab.schemas.search import SearchExecution
+from research_lab.schemas.search import SearchExecution, SearchStatus, SourceStatus
 from research_lab.validation.references import find_duplicate, normalize_title
 
 # Champs complétés lorsqu'une autre source apporte une valeur manquante.
@@ -105,10 +105,49 @@ class CorpusCheck:
     warnings: list[str]
 
 
-def check_corpus(papers: list[Paper], log: list[SearchExecution], min_corpus_size: int) -> CorpusCheck:
-    """Vérifie l'intégrité du corpus : identifiants, provenance rattachée au journal, doublons."""
+def capped_searches(log: list[SearchExecution], max_examinable_results: int) -> tuple[list[str], list[str]]:
+    """Recherches bibliographiques dont une source annonçait plus de résultats que ceux examinés.
+
+    Renvoie (à compléter, trop larges). « À compléter » : au plus `max_examinable_results` résultats
+    disponibles, il faut relancer avec un --max-results suffisant. « Trop larges » : la requête est à affiner,
+    et le plafond doit figurer dans les limites. Une recherche relancée à l'identique (mêmes texte, période
+    et source) qui a tout examiné lève le plafond. Les recherches contradictoires ne sont pas concernées.
+    """
+    def key(s: SearchExecution, source: str) -> tuple:
+        return (s.query.text, s.query.date_from, s.query.date_to, source)
+
+    searches = [s for s in log if s.gap_id is None and s.status != SearchStatus.FAILED]
+    complete = {
+        key(s, r.source) for s in searches for r in s.results
+        if r.status == SourceStatus.OK and r.total_available is not None and r.hits >= r.total_available
+    }
+    to_complete: list[str] = []
+    too_broad: list[str] = []
+    for s in searches:
+        for r in s.results:
+            if r.status != SourceStatus.OK or r.total_available is None or r.hits >= r.total_available:
+                continue
+            if key(s, r.source) in complete:
+                continue
+            detail = f"{s.search_id} ({s.query.text!r}, {r.source}) : {r.hits} résultats examinés sur {r.total_available}"
+            if r.total_available <= max_examinable_results:
+                to_complete.append(f"{detail} ; relancer la même requête avec --max-results {r.total_available}")
+            else:
+                too_broad.append(f"{detail} ; requête trop large, à affiner (plafond à signaler dans les limites)")
+    return to_complete, too_broad
+
+
+def check_corpus(
+    papers: list[Paper], log: list[SearchExecution], min_corpus_size: int, max_examinable_results: int | None = None
+) -> CorpusCheck:
+    """Vérifie l'intégrité du corpus : identifiants, provenance rattachée au journal, doublons, plafonds."""
     errors: list[str] = []
     warnings: list[str] = []
+    to_complete: list[str] = []
+    if max_examinable_results is not None:
+        to_complete, too_broad = capped_searches(log, max_examinable_results)
+        warnings.extend(f"Recherche plafonnée : {m}" for m in to_complete)
+        warnings.extend(f"Recherche plafonnée : {m}" for m in too_broad)
     known_searches = {s.search_id for s in log}
 
     seen_ids: set[str] = set()
@@ -143,6 +182,8 @@ def check_corpus(papers: list[Paper], log: list[SearchExecution], min_corpus_siz
     elif len(papers) < min_corpus_size:
         status = CorpusStatus.NEEDS_MORE_RESEARCH
         warnings.append(f"Corpus de {len(papers)} publications, minimum fixé par la politique : {min_corpus_size}")
+    elif to_complete:
+        status = CorpusStatus.NEEDS_MORE_RESEARCH
     else:
         status = CorpusStatus.OK
     return CorpusCheck(status=status, paper_count=len(papers), errors=errors, warnings=warnings)

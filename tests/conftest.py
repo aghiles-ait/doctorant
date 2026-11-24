@@ -56,12 +56,16 @@ def lab_root(tmp_path, monkeypatch) -> Path:
     shutil.copytree(REPO_ROOT / "config", tmp_path / "config")
     sources_file = tmp_path / "config" / "academic-sources.yaml"
     sources = yaml.safe_load(sources_file.read_text())
-    sources["retry"]["backoff_seconds"] = 0
+    sources["retry"]["delays_seconds"] = [0]
     for provider in sources["providers"].values():
         provider["min_interval_seconds"] = 0
     sources["fulltext"]["min_interval_seconds"] = 0
     sources["fulltext"]["min_extracted_chars"] = 50
     sources_file.write_text(yaml.safe_dump(sources))
+    costs_file = tmp_path / "config" / "costs.yaml"  # jamais les transcriptions réelles de Claude Code
+    costs = yaml.safe_load(costs_file.read_text())
+    costs["transcripts_dir"] = str(tmp_path / "transcripts")
+    costs_file.write_text(yaml.safe_dump(costs))
     monkeypatch.setenv("RESEARCH_LAB_ROOT", str(tmp_path))
     monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
     monkeypatch.delenv("OPENALEX_MAILTO", raising=False)

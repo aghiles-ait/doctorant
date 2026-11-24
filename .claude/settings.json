@@ -27,9 +27,34 @@
       "Bash(*research-lab gate approve*)",
       "Bash(*research-lab gate revise*)",
       "Bash(*decide_gate*)",
+      "Bash(*research-lab eval rate*)",
+      "Write(research/projects/**/human-evaluation.json)",
+      "Edit(research/projects/**/human-evaluation.json)",
       "Edit(knowledge/papers/**)",
       "Write(knowledge/papers/**)",
       "Bash(sqlite3 *)"
+    ]
+  },
+  "hooks": {
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.venv/bin/research-lab costs sync --quiet || true"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.venv/bin/research-lab costs sync --quiet || true"
+          }
+        ]
+      }
     ]
   }
 }

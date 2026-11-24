@@ -396,6 +396,57 @@ _MIGRATIONS: list[str] = [
     CREATE TRIGGER objection_responses_no_delete BEFORE DELETE ON objection_responses
     BEGIN SELECT RAISE(ABORT, 'l''historique des réponses est en ajout seul'); END;
     """,
+    # 8 — transitions forcées (`project transition --force`), signalées dans l'historique
+    """
+    ALTER TABLE state_changes ADD COLUMN forced INTEGER NOT NULL DEFAULT 0;
+    """,
+    # 9 — pages du texte intégral affichées par `fulltext show`, par projet (couverture de lecture)
+    """
+    CREATE TABLE page_reads (
+        project_id     TEXT NOT NULL REFERENCES projects(project_id),
+        paper_id       TEXT NOT NULL REFERENCES papers(paper_id),
+        page           INTEGER NOT NULL CHECK (page >= 1),
+        text_sha256    TEXT NOT NULL,  -- texte affiché : une nouvelle extraction repart de zéro
+        first_shown_at TEXT NOT NULL,
+        PRIMARY KEY (project_id, paper_id, page, text_sha256)
+    );
+    """,
+    # 10 — évaluation humaine des gaps et des hypothèses (sprint 4)
+    """
+    CREATE TABLE rating_sessions (
+        session_id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(project_id),
+        rater      TEXT NOT NULL,
+        at         TEXT NOT NULL,
+        record     TEXT NOT NULL  -- RatingSession complète, JSON
+    );
+    CREATE TRIGGER rating_sessions_append_only BEFORE UPDATE ON rating_sessions
+    BEGIN SELECT RAISE(ABORT, 'une évaluation humaine est immuable'); END;
+    CREATE TRIGGER rating_sessions_no_delete BEFORE DELETE ON rating_sessions
+    BEGIN SELECT RAISE(ABORT, 'une évaluation humaine est immuable'); END;
+    """,
+    # 11 — consommation de jetons des agents, lue dans les transcriptions de Claude Code (sprint 4)
+    """
+    CREATE TABLE llm_usage (
+        message_id         TEXT PRIMARY KEY,  -- identifiant de la réponse du modèle : une seule fois
+        session_id         TEXT NOT NULL,
+        agent_id           TEXT,              -- sous-agent, ou NULL pour la session principale
+        agent_type         TEXT NOT NULL,     -- doctorant, scientific-reviewer, main…
+        project_id         TEXT,              -- NULL : hors agent de recherche ou projet non identifié
+        model              TEXT NOT NULL,
+        at                 TEXT NOT NULL,
+        input_tokens       INTEGER NOT NULL,
+        output_tokens      INTEGER NOT NULL,
+        cache_write_5m     INTEGER NOT NULL,
+        cache_write_1h     INTEGER NOT NULL,
+        cache_read_tokens  INTEGER NOT NULL
+    );
+    CREATE INDEX llm_usage_project ON llm_usage (project_id);
+    CREATE TRIGGER llm_usage_append_only BEFORE UPDATE ON llm_usage
+    BEGIN SELECT RAISE(ABORT, 'la consommation enregistrée est en ajout seul'); END;
+    CREATE TRIGGER llm_usage_no_delete BEFORE DELETE ON llm_usage
+    BEGIN SELECT RAISE(ABORT, 'la consommation enregistrée est en ajout seul'); END;
+    """,
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)

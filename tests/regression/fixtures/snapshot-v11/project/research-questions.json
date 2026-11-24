@@ -1,0 +1,39 @@
+[
+  {
+    "question": "Q ?",
+    "gap_ids": [
+      "GAP-001"
+    ],
+    "rationale": "GAP-001",
+    "hypotheses": [
+      {
+        "hypothesis_id": "H1",
+        "statement": "s",
+        "prediction": "p",
+        "refutation_criterion": "r",
+        "test_method": "m",
+        "metrics": [
+          "taux"
+        ],
+        "evidence": [
+          "EV-001"
+        ]
+      }
+    ],
+    "constraints": [],
+    "limitations": [
+      "corpus limité"
+    ],
+    "status": "active",
+    "question_id": "RQ-001",
+    "project_id": "decentralized-ai-governance",
+    "version": 2,
+    "created_at": "2026-11-24T13:06:15Z",
+    "updated_at": "2026-11-24T13:06:15Z",
+    "actor": "aghilesaitmessaoud",
+    "reason": "r",
+    "cited_papers": [
+      "PAPER-001"
+    ]
+  }
+]

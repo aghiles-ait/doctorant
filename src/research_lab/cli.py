@@ -1,8 +1,12 @@
 """Interface en ligne de commande `research-lab`, appelée par les Skills."""
 
+import dataclasses
 import getpass
 import json
+import shutil
+import sqlite3
 import sys
+import webbrowser
 from datetime import date
 from pathlib import Path
 from typing import Annotated
@@ -12,13 +16,25 @@ from pydantic import BaseModel, ValidationError
 
 from research_lab.config import Settings, load_settings
 from research_lab.corpus import CorpusStatus, check_corpus
+from research_lab.costs import Line, cost_report, load_usage, sync
 from research_lab.critique import CritiqueError, check_critique, respond, submit_review
+from research_lab.evaluation import (
+    EvaluationError,
+    current_ratings,
+    evaluation_summary,
+    quality_report,
+    rating_targets,
+    record_ratings,
+)
 from research_lab.fulltext import FulltextFetcher
+from research_lab.schemas.evaluation import Rating
 from research_lab.gaps import GapError, add_gap, check_gaps, revise_gap, set_alignment
 from research_lab.schemas.gap import AlignmentDraft, GapDraft
 from research_lab.proposal import ProposalError, check_proposal_file, write_references
 from research_lab.providers import build_providers
 from research_lab.questions import QuestionError, add_question, check_questions, revise_question
+from research_lab.reading import check_reading, coverage, outline, parse_page_range, select_pages
+from research_lab.resume import resume_report
 from research_lab.review import ReviewError, add_evidence, decide, fetch_fulltexts, withdraw_evidence
 from research_lab.schemas.evidence import EvidenceType, FulltextStatus
 from research_lab.schemas.paper import PaperStatus, Source
@@ -80,6 +96,14 @@ proposal_app = typer.Typer(
 gate_app = typer.Typer(
     help="Validations humaines : Gate 1 (gaps retenus), Gate 2 (Research Proposal).", no_args_is_help=True
 )
+eval_app = typer.Typer(
+    help="Évaluation de la qualité scientifique : indicateurs Q1 à Q5, notation humaine des gaps et hypothèses.",
+    no_args_is_help=True,
+)
+costs_app = typer.Typer(
+    help="Suivi des coûts : jetons consommés par les agents, d'après les transcriptions de Claude Code.",
+    no_args_is_help=True,
+)
 app.add_typer(project_app, name="project")
 app.add_typer(watch_app, name="watch")
 app.add_typer(corpus_app, name="corpus")
@@ -93,6 +117,8 @@ app.add_typer(question_app, name="question")
 app.add_typer(solution_app, name="solution")
 app.add_typer(critique_app, name="critique")
 app.add_typer(proposal_app, name="proposal")
+app.add_typer(eval_app, name="eval")
+app.add_typer(costs_app, name="costs")
 app.add_typer(db_app, name="db")
 
 ProjectId = Annotated[str, typer.Argument(help="Identifiant du projet (ex. decentralized-ai-governance)")]
@@ -114,7 +140,7 @@ def _settings_and_db() -> tuple[Settings, Database]:
 
 def _context(project_id: str) -> tuple[Settings, ProjectRepository]:
     settings, db = _settings_and_db()
-    return settings, ProjectRepository(db, settings.projects_dir, project_id)
+    return settings, ProjectRepository(db, settings.projects_dir, project_id, settings.papers_dir)
 
 
 def _require_project(repo: ProjectRepository) -> None:
@@ -176,16 +202,48 @@ def project_status(project_id: ProjectId, as_json: JsonFlag = False) -> None:
     typer.echo(f"Corpus : {len(papers)} publications, {len(log)} recherches journalisées")
 
 
+@project_app.command("resume")
+def project_resume(
+    project_id: ProjectId,
+    repair: Annotated[bool, typer.Option("--repair", help="Régénérer les exports périmés depuis la base")] = False,
+    as_json: JsonFlag = False,
+) -> None:
+    """Où reprendre un projet interrompu : état, étape, instructions humaines, ce qui bloque la suite."""
+    settings, repo = _context(project_id)
+    _require_project(repo)
+    if repair:
+        repo.export()
+    report = resume_report(repo, settings)
+    if as_json:
+        _print_json(dataclasses.asdict(report))
+        return
+    since = f" depuis {report.since.isoformat()}" if report.since else ""
+    typer.echo(f"Projet : {report.project_id}\nÉtat   : {report.state}{since}"
+               + (" (transition forcée)" if report.last_change_forced else ""))
+    typer.echo(f"Étape  : {report.step}\nAction : {report.action}")
+    if report.human_instructions:
+        typer.echo(f"Décision humaine : {report.human_instructions}")
+    for target, blockers in report.next_steps.items():
+        typer.echo(f"→ {target} : " + ("possible" if not blockers else "bloqué"))
+        for blocker in blockers:
+            typer.echo(f"    - {blocker}")
+    if report.stale_exports:
+        typer.echo(f"Exports périmés : {', '.join(report.stale_exports)} (`project resume {project_id} --repair`)")
+
+
 @project_app.command("transition")
 def project_transition(
     project_id: ProjectId,
     target: Annotated[ResearchState, typer.Argument(help="État cible")],
+    force: Annotated[
+        bool, typer.Option("--force", help="N'importe quel état, sans précondition (hors gates) ; tracé dans l'historique")
+    ] = False,
 ) -> None:
     """Fait passer le projet à l'état suivant si les préconditions sont remplies."""
     settings, repo = _context(project_id)
     _require_project(repo)
     try:
-        project = repo.transition(target, actor=getpass.getuser(), policy=settings.policy)
+        project = repo.transition(target, actor=getpass.getuser(), policy=settings.policy, force=force)
     except TransitionError as exc:
         _fail(f"Transition refusée : {exc}")
     typer.echo(f"{project.project_id} : état {project.state}")
@@ -335,7 +393,10 @@ def corpus_check(project_id: ProjectId, as_json: JsonFlag = False) -> None:
     """Contrôle l'intégrité du corpus : renvoie OK, NEEDS_MORE_RESEARCH ou BLOCKED."""
     settings, repo = _context(project_id)
     _require_project(repo)
-    result = check_corpus(repo.load_papers(), repo.load_search_log(), settings.policy.min_corpus_size)
+    result = check_corpus(
+        repo.load_papers(), repo.load_search_log(), settings.policy.min_corpus_size,
+        settings.policy.max_examinable_results,
+    )
     if as_json:
         _print_json({"status": result.status, "paper_count": result.paper_count, "errors": result.errors, "warnings": result.warnings})
     else:
@@ -380,19 +441,28 @@ def fulltext_status(project_id: ProjectId, as_json: JsonFlag = False) -> None:
         if p.status != PaperStatus.INCLUDED:
             continue
         record = load_fulltext(repo.db, p.paper_id)
+        try:
+            reading = repo.paper_coverage(p.paper_id)
+        except FulltextTampered as exc:
+            _fail(str(exc))
         rows.append({
             "paper_id": p.paper_id,
             "status": record.status if record else "not_attempted",
             "pages": record.page_count if record else None,
             "error": record.error if record else None,
+            "reading": reading.as_dict() if reading else None,
+            "reading_summary": reading.summary() if reading else None,
             "title": p.title,
         })
     if as_json:
         _print_json(rows)
         return
     for r in rows:
-        detail = f"{r['pages']} pages" if r["pages"] else (r["error"] or "")
-        typer.echo(f"{r['paper_id']}  {r['status']:<13}  {r['title'][:60]:<60}  {detail[:80]}")
+        detail = r["reading_summary"] or r["error"] or ""
+        typer.echo(f"{r['paper_id']}  {r['status']:<13}  {r['title'][:60]:<60}  {detail[:120]}")
+    complete = sum(1 for r in rows if r["reading"] and r["reading"]["complete"])
+    available = sum(1 for r in rows if r["reading"])
+    typer.echo(f"{complete}/{available} textes intégraux disponibles lus en entier (texte principal)")
 
 
 @fulltext_app.command("show")
@@ -400,21 +470,52 @@ def fulltext_show(
     project_id: ProjectId,
     paper_id: Annotated[str, typer.Argument()],
     page: Annotated[int | None, typer.Option(help="Afficher une seule page")] = None,
+    pages: Annotated[str | None, typer.Option(help="Afficher une plage de pages, par exemple 3-7")] = None,
+    as_json: JsonFlag = False,
 ) -> None:
-    """Affiche le texte intégral extrait, avec les numéros de page à citer dans les preuves."""
+    """Sans option : plan du texte (pages, taille, lues ou non). Avec --page/--pages : texte à citer.
+
+    Chaque appel affiche au plus `fulltext.max_show_chars` caractères (une sortie trop longue peut être
+    tronquée avant d'atteindre le modèle) ; les pages affichées sont enregistrées comme lues.
+    """
     settings, repo = _context(project_id)
     _require_project(repo)
     if repo.get_paper(paper_id) is None:
         _fail(f"{paper_id} absent du corpus de {project_id}")
     try:
-        pages, _ = read_pages(repo.db, settings.papers_dir, paper_id)
+        text_pages, digest = read_pages(repo.db, settings.papers_dir, paper_id)
     except (FileNotFoundError, FulltextTampered) as exc:
         _fail(str(exc))
-    if page is not None and not 1 <= page <= len(pages):
-        _fail(f"{paper_id} a {len(pages)} pages")
-    for number, text in enumerate(pages, start=1):
-        if page is None or number == page:
-            typer.echo(f"===== {paper_id} — page {number}/{len(pages)} =====\n{text}\n")
+    if page is not None and pages is not None:
+        _fail("--page et --pages sont exclusifs")
+    read = repo.pages_read(paper_id, digest)
+
+    if page is None and pages is None:
+        rows = outline(text_pages, read)
+        summary = coverage(paper_id, text_pages, read).summary()
+        if as_json:
+            _print_json({"paper_id": paper_id, "summary": summary, "pages": rows})
+            return
+        typer.echo(f"{paper_id} : {len(text_pages)} pages ; {summary}")
+        for r in rows:
+            mark = "lue" if r["read"] else "   "
+            refs = " [réf.]" if r["references"] else ""
+            typer.echo(f"  p.{r['page']:<4} {r['chars']:>6} car.  {mark}{refs}  {r['first_line']}")
+        typer.echo(f"Lire : fulltext show {project_id} {paper_id} --pages N-M "
+                   f"(au plus {settings.sources.fulltext.max_show_chars} caractères par appel)")
+        return
+
+    try:
+        first, last = parse_page_range(pages if pages is not None else str(page), len(text_pages))
+    except ValueError as exc:
+        _fail(f"{paper_id} : {exc}")
+    shown = select_pages(text_pages, first, last, settings.sources.fulltext.max_show_chars)
+    repo.record_page_reads(paper_id, shown, digest)
+    for number in shown:
+        typer.echo(f"===== {paper_id} — page {number}/{len(text_pages)} =====\n{text_pages[number - 1]}\n")
+    if shown[-1] < last:
+        typer.echo(f"===== limite de {settings.sources.fulltext.max_show_chars} caractères atteinte : "
+                   f"pages {shown[-1] + 1}-{last} non affichées, relancer avec --pages {shown[-1] + 1}-{last} =====")
 
 
 # --- evidence ----------------------------------------------------------------
@@ -489,14 +590,21 @@ def evidence_withdraw(
 
 @review_app.command("check")
 def review_check(project_id: ProjectId, as_json: JsonFlag = False) -> None:
-    """Vérifie les citations de literature-review.md (PAPER-xxx et EV-xxx)."""
-    _, repo = _context(project_id)
+    """Vérifie les citations de literature-review.md (PAPER-xxx et EV-xxx) et la lecture des textes intégraux."""
+    settings, repo = _context(project_id)
     _require_project(repo)
     path = repo.dir / "literature-review.md"
     text = path.read_text(encoding="utf-8") if path.exists() else None
     result = check_literature_review(text, repo.load_papers(), repo.load_evidence())
+    try:
+        coverages = repo.reading_coverage()
+    except FulltextTampered as exc:
+        _fail(str(exc))
+    if settings.policy.require_full_reading:
+        result.errors.extend(check_reading(coverages.values(), project_id))
     if as_json:
         _print_json({"errors": result.errors, "warnings": result.warnings,
+                     "fully_read": sorted(pid for pid, c in coverages.items() if c.complete),
                      "cited_papers": result.cited_papers, "cited_evidence": result.cited_evidence})
     else:
         status = "BLOCKED" if result.errors else "OK"
@@ -1156,6 +1264,157 @@ def proposal_check(project_id: ProjectId, as_json: JsonFlag = False) -> None:
         raise typer.Exit(2)
 
 
+# --- eval --------------------------------------------------------------------
+
+
+@eval_app.command("report")
+def eval_report(project_id: ProjectId, as_json: JsonFlag = False) -> None:
+    """Indicateurs calculés par le code (Q1 à Q5, revue, workflow). Ils ne jugent pas la valeur scientifique."""
+    settings, repo = _context(project_id)
+    _require_project(repo)
+    report = quality_report(repo, settings)
+    ratings = current_ratings(repo.load_rating_sessions())
+    if as_json:
+        _print_json({**report.as_dict(), "human_ratings": {t: r.model_dump(mode="json") for t, r in ratings.items()}})
+        return
+    typer.echo(f"Projet : {report.project_id} ({report.state})")
+    for i in report.indicators:
+        mark = {True: "ok ", False: "KO ", None: "   "}[i.ok]
+        typer.echo(f"  {mark} {i.control:<8} {i.name} : {i.value}")
+    targets = rating_targets(repo)
+    typer.echo(f"Évaluation humaine : {sum(t.target in ratings for t in targets)}/{len(targets)} gaps et hypothèses notés"
+               + ("" if ratings else f" (`research-lab eval rate {project_id}`, dans ton terminal)"))
+
+
+@eval_app.command("rate")
+def eval_rate(project_id: ProjectId) -> None:
+    """Notation humaine des gaps et des hypothèses, critère par critère (terminal interactif, jamais par un agent)."""
+    settings, repo = _context(project_id)
+    _require_project(repo)
+    if reason := human_check_failure():
+        _fail(f"Évaluation refusée : {reason}")
+    config = settings.policy.evaluation
+    targets = rating_targets(repo)
+    if not targets:
+        _fail("Rien à évaluer : ni gap, ni hypothèse")
+    previous = current_ratings(repo.load_rating_sessions())
+    typer.echo(f"Échelle : {config.scale[0]} (très insuffisant) à {config.scale[-1]} (excellent) ; Entrée vide : passer")
+    ratings: list[Rating] = []
+    for target in targets:
+        criteria = config.gap_criteria if target.kind == "gap" else config.hypothesis_criteria
+        typer.echo(f"\n{target.target} (v{target.version}) — {target.title}\n{target.detail}")
+        if old := previous.get(target.target):
+            typer.echo(f"  note précédente : {old.scores}")
+        scores: dict[str, int] = {}
+        for criterion, question in criteria.items():
+            answer = typer.prompt(f"  {criterion} — {question}", default="", show_default=False).strip()
+            if not answer:
+                break
+            while not answer.isdigit() or int(answer) not in config.scale:
+                answer = typer.prompt(f"  {criterion} : note parmi {config.scale}").strip()
+            scores[criterion] = int(answer)
+        if len(scores) == len(criteria):
+            comment = typer.prompt("  commentaire", default="", show_default=False)
+            ratings.append(Rating(target=target.target, target_version=target.version, scores=scores, comment=comment))
+    if not ratings:
+        _fail("Aucune note complète : rien n'a été enregistré")
+    comment = typer.prompt("\nCommentaire général", default="", show_default=False)
+    try:
+        session = record_ratings(repo, settings, ratings, rater=getpass.getuser(), comment=comment)
+    except EvaluationError as exc:
+        _fail(f"Évaluation refusée : {exc}")
+    typer.echo(f"{session.session_id} : {len(ratings)} notes enregistrées par {session.rater} (human-evaluation.json)")
+
+
+@eval_app.command("summary")
+def eval_summary(as_json: JsonFlag = False) -> None:
+    """Synthèse de l'évaluation humaine, tous projets : sujets évalués (cible du MVP) et moyennes par critère."""
+    settings, db = _settings_and_db()
+    summary = evaluation_summary(db, settings)
+    if as_json:
+        _print_json({**dataclasses.asdict(summary), "target_met": summary.target_met})
+        return
+    status = "atteinte" if summary.target_met else "non atteinte"
+    typer.echo(f"Sujets évalués par un humain : {len(summary.rated_projects)} (cible {summary.min_rated_topics}, {status})")
+    for pid, topic in summary.rated_projects.items():
+        typer.echo(f"  {pid} — {topic}")
+    for criterion, average in summary.averages.items():
+        typer.echo(f"  {criterion:<16} {average}")
+
+
+# --- costs -------------------------------------------------------------------
+
+
+@costs_app.command("sync")
+def costs_sync(quiet: Annotated[bool, typer.Option("--quiet", help="Sans sortie (hook de Claude Code)")] = False) -> None:
+    """Enregistre dans la base la consommation lue dans les transcriptions de Claude Code (idempotent)."""
+    settings, db = _settings_and_db()
+    count = sync(db, settings)
+    if not quiet:
+        typer.echo(f"{count} réponses du modèle enregistrées (transcriptions : {settings.transcripts_dir})")
+
+
+def _cost_lines(title: str, lines: dict[str, Line]) -> None:
+    typer.echo(f"{title} :")
+    for name, line in sorted(lines.items(), key=lambda item: -item[1].cost):
+        typer.echo(f"  {name:<24} {line.cost:>9.2f} $  {line.responses:>6} réponses  "
+                   f"entrée {line.input_tokens:>11,}  sortie {line.output_tokens:>9,}  cache lu {line.cache_read_tokens:>13,}")
+
+
+@costs_app.command("report")
+def costs_report(
+    project_id: Annotated[str | None, typer.Argument(help="Projet (défaut : toute la base, projets et développement)")] = None,
+    as_json: JsonFlag = False,
+) -> None:
+    """Coût en équivalent API par agent, état du workflow et modèle (synchronise d'abord)."""
+    settings, db = _settings_and_db()
+    sync(db, settings)
+    project = None
+    if project_id:
+        repo = ProjectRepository(db, settings.projects_dir, project_id, settings.papers_dir)
+        _require_project(repo)
+        project = repo.load_project()
+    report = cost_report(load_usage(db, project_id), settings.costs.prices, project)
+    if as_json:
+        _print_json(dataclasses.asdict(report))
+        return
+    scope = project_id or "toute la base"
+    typer.echo(f"Coûts ({scope}) : {report.total.cost:.2f} $ en équivalent API, {report.total.responses} réponses, "
+               f"{report.agent_runs} sessions ou sous-agents")
+    _cost_lines("Par agent", report.by_agent)
+    if report.by_state:
+        _cost_lines("Par état du workflow", report.by_state)
+    _cost_lines("Par modèle", report.by_model)
+    if report.unpriced_models:
+        typer.echo(f"Modèles sans prix (config/costs.yaml) : {', '.join(report.unpriced_models)}")
+
+
+# --- serve -------------------------------------------------------------------
+
+
+@app.command("serve")
+def serve(
+    port: Annotated[int, typer.Option(help="Port d'écoute (127.0.0.1 seulement)")] = 8765,
+    open_page: Annotated[bool, typer.Option("--open", help="Ouvrir l'interface dans le navigateur")] = False,
+) -> None:
+    """Interface web : projets, diagramme d'état, livrables de chaque état, qualité et coûts (lecture seule)."""
+    import uvicorn
+
+    from research_lab.api import create_app
+
+    settings, db = _settings_and_db()
+    sync(db, settings)  # coûts à jour
+    db.conn.close()
+    dist = settings.root / "web" / "dist"
+    if not (dist / "index.html").is_file():
+        typer.echo(f"Interface non compilée ({dist}) : cd web && npm install && npm run build. API seule disponible.")
+    url = f"http://127.0.0.1:{port}/"
+    typer.echo(f"Interface : {url}  (API : {url}api/docs ; Ctrl+C pour arrêter)")
+    if open_page:
+        webbrowser.open(url)
+    uvicorn.run(create_app(settings.root, dist), host="127.0.0.1", port=port, log_level="warning")
+
+
 # --- db ----------------------------------------------------------------------
 
 
@@ -1181,6 +1440,24 @@ def db_import_files(
         except (ImportConflict, ProjectNotFound, ValidationError) as exc:
             _fail(f"Import de {pid} refusé, base inchangée : {exc}")
         typer.echo(f"{pid} : {count} publications importées (originaux dans {pid}/migration-backup/)")
+
+
+@db_app.command("backup")
+def db_backup(
+    target: Annotated[Path, typer.Argument(help="Dossier de sauvegarde (créé ; doit être absent ou vide)")],
+) -> None:
+    """Sauvegarde cohérente du laboratoire : base, textes intégraux, dossiers des projets (non versionnés)."""
+    settings, db = _settings_and_db()
+    if target.exists() and any(target.iterdir()):
+        _fail(f"{target} n'est pas vide")
+    (target / "knowledge").mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(target / "knowledge" / "research.db") as copy:
+        db.conn.backup(copy)  # cohérent même si une autre commande écrit en même temps
+    for source, name in ((settings.papers_dir, "knowledge/papers"), (settings.projects_dir, "research/projects")):
+        if source.exists():
+            shutil.copytree(source, target / name, ignore=shutil.ignore_patterns("*.tmp"))
+    version = db.conn.execute("PRAGMA user_version").fetchone()[0]
+    typer.echo(f"Sauvegarde dans {target} (schéma v{version}) : knowledge/research.db, knowledge/papers, research/projects")
 
 
 @db_app.command("info")

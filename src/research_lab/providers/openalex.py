@@ -19,9 +19,12 @@ from research_lab.validation.references import (
 _SELECT = "id,doi,display_name,publication_date,authorships,abstract_inverted_index,primary_location,locations,type"
 
 
-def build_filter(query: SearchQuery) -> str:
-    """Recherche dans le titre et le résumé (et non le texte intégral), bornée par dates."""
-    parts = [f"title_and_abstract.search:{query.text.replace(',', ' ')}"]
+def build_filter(query: SearchQuery, extra: list[str] | tuple[str, ...] = ()) -> str:
+    """Recherche dans le titre et le résumé (et non le texte intégral), bornée par dates.
+
+    `extra` : filtres de la configuration (discipline, résumé exigé, types de publication).
+    """
+    parts = [f"title_and_abstract.search:{query.text.replace(',', ' ')}", *extra]
     if query.date_from:
         parts.append(f"from_publication_date:{query.date_from.isoformat()}")
     if query.date_to:
@@ -99,7 +102,7 @@ class OpenAlexProvider:
         self._http = HttpClient(config, retry, sleep=sleep, params=auth_params())
 
     def search(self, query: SearchQuery) -> ProviderResult:
-        filter_ = build_filter(query)
+        filter_ = build_filter(query, self._config.filters)
         hits: list[SourceHit] = []
         warnings: list[str] = []
         total: int | None = None

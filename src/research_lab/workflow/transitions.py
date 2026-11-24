@@ -3,6 +3,10 @@
 Chaque transition autorisée a une précondition qui examine l'état vérifiable du projet
 (`ProjectFacts`). Les transitions des gates passent par workflow/approvals.py ; les autres
 transitions non listées lèvent une erreur explicite.
+
+En développement, `project transition --force` permet d'aller vers n'importe quel état, en avant
+ou en arrière, sans précondition ; la transition est marquée `forced` dans l'historique. Les
+décisions des gates restent réservées à l'humain.
 """
 
 from collections.abc import Callable
@@ -25,6 +29,8 @@ class ProjectFacts:
     without_fulltext_attempt: list[str]
     active_evidence_count: int
     review_errors: list[str]  # contrôle des citations de literature-review.md
+    # Publications incluses dont le texte principal n'a pas été affiché en entier (policy require_full_reading).
+    unread_fulltexts: list[str]
     question_errors: list[str]  # contrôle des questions de recherche (research-lab question check)
     solution_errors: list[str]  # contrôle des solutions et de leur comparaison (research-lab solution check)
     review_rounds: int  # passages à SCIENTIFIC_REVIEW depuis la dernière révision demandée à la Gate 2
@@ -57,6 +63,7 @@ def _review_complete(facts: ProjectFacts) -> str | None:
     if not facts.active_evidence_count:
         problems.append("aucune preuve enregistrée")
     problems.extend(f"literature-review.md : {e}" for e in facts.review_errors)
+    problems.extend(f"lecture incomplète : {e}" for e in facts.unread_fulltexts)
     return " ; ".join(problems) or None
 
 
@@ -131,3 +138,18 @@ def check_transition(current: S, target: S, facts: ProjectFacts) -> None:
         raise TransitionError(f"Transition {current} → {target} non autorisée (ou pas encore implémentée)")
     if (error := precondition(facts)) is not None:
         raise TransitionError(error)
+
+
+# États qu'une transition forcée ne peut ni quitter ni atteindre : la soumission à une gate fige un
+# dossier et seule la décision humaine en sort ; COMPLETED n'est atteint que par l'approbation de la Gate 2.
+_GATE_STATES = {S.AWAITING_GATE_1, S.AWAITING_GATE_2, S.COMPLETED}
+
+
+def check_forced_transition(current: S, target: S) -> None:
+    if target == current:
+        raise TransitionError(f"Le projet est déjà à l'état {current}")
+    if current in _GATE_STATES - {S.COMPLETED} or target in _GATE_STATES:
+        raise TransitionError(
+            f"Transition forcée {current} → {target} refusée : les gates restent décidées par un humain "
+            "(`research-lab gate submit`, puis `gate approve` ou `gate revise`)"
+        )

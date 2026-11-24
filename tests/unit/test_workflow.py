@@ -59,3 +59,35 @@ def test_state_survives_reload(tmp_path, repo):
     repo.db.close()
     reopened = ProjectRepository(Database(tmp_path / "research.db"), tmp_path / "projects", "test-project")
     assert reopened.load_project().state == ResearchState.SCOPING
+
+
+def test_forced_transition_skips_preconditions_and_is_traced(repo):
+    repo.transition(ResearchState.SCOPING, actor="alice", policy=POLICY)
+    with pytest.raises(TransitionError, match="scope.md"):
+        repo.transition(ResearchState.LITERATURE_SEARCH, actor="alice", policy=POLICY)
+    repo.transition(ResearchState.SOLUTION_DESIGN, actor="alice", policy=POLICY, force=True)
+    repo.transition(ResearchState.SCOPING, actor="alice", policy=POLICY, force=True)  # retour en arrière
+    history = repo.load_project().history
+    assert [(c.to_state, c.forced) for c in history[-3:]] == [
+        (ResearchState.SCOPING, False), (ResearchState.SOLUTION_DESIGN, True), (ResearchState.SCOPING, True),
+    ]
+    assert "forced: true" in repo.project_file.read_text()
+
+
+@pytest.mark.parametrize("target", [ResearchState.AWAITING_GATE_1, ResearchState.AWAITING_GATE_2, ResearchState.COMPLETED])
+def test_forced_transition_cannot_bypass_gates(repo, target):
+    with pytest.raises(TransitionError, match="humain"):
+        repo.transition(target, actor="alice", policy=POLICY, force=True)
+
+
+def test_forced_transition_requires_a_different_state(repo):
+    repo.transition(ResearchState.GAP_ANALYSIS, actor="alice", policy=POLICY, force=True)
+    with pytest.raises(TransitionError, match="déjà"):
+        repo.transition(ResearchState.GAP_ANALYSIS, actor="alice", policy=POLICY, force=True)
+
+
+def test_forced_transition_cannot_leave_a_gate():
+    from research_lab.workflow.transitions import check_forced_transition
+    for gate in (ResearchState.AWAITING_GATE_1, ResearchState.AWAITING_GATE_2):
+        with pytest.raises(TransitionError, match="humain"):
+            check_forced_transition(gate, ResearchState.SOLUTION_DESIGN)

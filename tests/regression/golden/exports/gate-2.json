@@ -1,0 +1,41 @@
+[
+  {
+    "round": 1,
+    "submission": {
+      "project_id": "decentralized-ai-governance",
+      "gate": "gate_2",
+      "round": 1,
+      "submitted_at": "<datetime>",
+      "actor": "<user>",
+      "artifacts": {
+        "research-questions.json": "sha256:<sha256>",
+        "solutions.json": "sha256:<sha256>",
+        "scientific-review.json": "sha256:<sha256>",
+        "research-proposal.md": "sha256:<sha256>",
+        "references.bib": "sha256:<sha256>"
+      },
+      "gap_versions": {},
+      "question_versions": {
+        "RQ-001": 2
+      },
+      "solution_versions": {
+        "SOL-001": 1,
+        "SOL-002": 1
+      },
+      "check_status": "OK",
+      "check_warnings": []
+    },
+    "decision": {
+      "project_id": "decentralized-ai-governance",
+      "gate": "gate_2",
+      "round": 1,
+      "decision": "approve",
+      "approver": "<user>",
+      "at": "<datetime>",
+      "comment": "Proposal accepté",
+      "selected_gaps": {},
+      "artifacts_verified": true,
+      "modified_artifacts": []
+    }
+  }
+]

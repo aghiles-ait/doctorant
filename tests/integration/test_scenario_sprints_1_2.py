@@ -86,6 +86,9 @@ def test_scenario_sprints_1_2(lab_root, fixture_text, tmp_path, monkeypatch):
         run("project", "transition", PROJECT, "LITERATURE_REVIEW", expect=1)
         policy = lab_root / "config" / "research-policy.yaml"
         policy.write_text(policy.read_text().replace("min_corpus_size: 20", "min_corpus_size: 4"))
+        # Réponses enregistrées plafonnées : examiner tout ce qui est annoncé, ou juger la requête trop large.
+        run("corpus", "check", PROJECT)
+        policy.write_text(policy.read_text().replace("max_examinable_results: 300", "max_examinable_results: 1"))
         run("project", "transition", PROJECT, "LITERATURE_REVIEW")
 
         step("SPRINT 2b — Tri selon scope.md")
@@ -100,7 +103,10 @@ def test_scenario_sprints_1_2(lab_root, fixture_text, tmp_path, monkeypatch):
 
         step("SPRINT 2b — Texte intégral des publications incluses")
         run("fulltext", "fetch", PROJECT)
-        run("fulltext", "show", PROJECT, dam, "--page", "2")
+        run("fulltext", "show", PROJECT, dam)  # plan : pages, taille, lues ou non
+        run("fulltext", "show", PROJECT, dam, "--pages", "1-2")
+        run("fulltext", "show", PROJECT, governance, "--pages", "1-99")
+        run("fulltext", "status", PROJECT)
 
         step("SPRINT 2b — Preuves : un extrait inventé est refusé, un extrait exact est accepté")
         run("evidence", "add", PROJECT, "--paper", dam, "--page", "2", "--type", "empirical_result",

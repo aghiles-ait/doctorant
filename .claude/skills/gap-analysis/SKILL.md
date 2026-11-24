@@ -55,8 +55,11 @@ dans `research/projects/<id>/drafts/`, transmis à la CLI qui les valide et les 
    ```
    .venv/bin/research-lab watch search <id> --for-gap GAP-xxx -q "…" [--from … --to …]
    ```
+   Requête courte (2 ou 3 termes) : une recherche qui ne ramène **aucun résultat** ne compte pas comme
+   recherche contradictoire (elle montre une requête trop étroite, pas l'absence de travaux) ; l'élargir.
    Puis trier les nouvelles publications (`corpus list <id> --status candidate`, `corpus decide`),
-   récupérer leur texte (`fulltext fetch`) et enregistrer les preuves utiles (`evidence add`),
+   récupérer leur texte (`fulltext fetch`), le lire en entier (`fulltext show … --pages N-M`, exigé par
+   `gap check` comme à l'état de l'art) et enregistrer les preuves utiles (`evidence add`),
    **en particulier celles qui contredisent le gap**.
 
 4. **Réviser le gap** à la lumière de cette recherche : modifier le brouillon (repartir de

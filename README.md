@@ -2,6 +2,13 @@
 
 Laboratoire de recherche scientifique assisté par IA, piloté depuis Claude Code.
 Spécification : [specs.md](specs.md).
+Procédures d'exploitation (suivre un projet, décisions humaines, déblocage, sauvegarde, coûts) :
+[docs/exploitation.md](docs/exploitation.md).
+
+**Pour s'y retrouver** : `.venv/bin/research-lab serve --open` lance l'interface web sur
+http://127.0.0.1:8765 : tous les projets, diagramme d'état, livrables de chaque état, prochaine étape, qualité,
+coûts. Les données sont lues dans la base à l'ouverture : recharger la page pour actualiser. Lecture seule : les
+décisions humaines restent dans le terminal.
 
 ## Installation
 
@@ -9,6 +16,9 @@ Spécification : [specs.md](specs.md).
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
 cp .env.example .env   # facultatif : clé API OpenAlex
+
+# Interface web (React, Node.js ≥ 18) : à compiler une fois, puis après chaque modification de web/
+cd web && npm install && npm run build && cd ..
 ```
 
 Les variables `OPENALEX_API_KEY` et `OPENALEX_MAILTO` sont lues dans l'environnement du
@@ -33,6 +43,17 @@ $L project init decentralized-ai-governance --topic "Decentralized AI governance
 $L project transition decentralized-ai-governance SCOPING
 # rédiger research/projects/decentralized-ai-governance/scope.md
 $L project transition decentralized-ai-governance LITERATURE_SEARCH
+# développement : n'importe quel état, en avant ou en arrière, sans précondition (hors gates) ;
+# la transition est marquée `forced` dans l'historique
+$L project transition decentralized-ai-governance SOLUTION_DESIGN --force
+# qualité : indicateurs Q1-Q5 ; notation humaine (dans ton terminal) ; synthèse tous projets
+$L eval report decentralized-ai-governance
+$L eval rate decentralized-ai-governance
+$L eval summary
+# coûts en équivalent API : par projet, ou toute la base
+$L costs report decentralized-ai-governance
+# reprise après interruption : état, étape, instructions humaines, blocages, exports périmés
+$L project resume decentralized-ai-governance [--repair]
 
 $L watch search decentralized-ai-governance -q '"AI governance" decentralized' --from 2022-01-01 --to 2026-10-26
 $L corpus list decentralized-ai-governance
@@ -54,7 +75,8 @@ $L corpus decide decentralized-ai-governance PAPER-004 --exclude --reason "…"
 
 $L fulltext fetch decentralized-ai-governance      # PDF en accès libre des publications incluses
 $L fulltext status decentralized-ai-governance
-$L fulltext show decentralized-ai-governance PAPER-001 --page 3
+$L fulltext show decentralized-ai-governance PAPER-001            # plan : pages, taille, lues ou non
+$L fulltext show decentralized-ai-governance PAPER-001 --pages 3-6  # texte (15 000 caractères au plus par appel)
 
 $L evidence add decentralized-ai-governance --paper PAPER-001 --page 3 --type empirical_result \
    --claim "…" --quote "extrait exact du texte"   # refusé si l'extrait n'est pas à cette page
@@ -252,7 +274,9 @@ de tes données de recherche.
 **Sprint 1 — implémenté**
 - Projet persistant et transitions `NEW → SCOPING → LITERATURE_SEARCH` contrôlées par le code
   (`scope.md` obligatoire avant la recherche).
-- Connecteurs arXiv et OpenAlex : pagination, limites de débit, relances.
+- Connecteurs arXiv et OpenAlex : pagination, limites de débit, relances (15, 60 puis 180 s, ou
+  `Retry-After` plafonné à 300 s), filtres configurables (catégories arXiv ; discipline, résumé exigé
+  et types de publication sur OpenAlex).
 - Corpus par projet (`papers.json`) : identifiants `PAPER-xxx` stables, déduplication
   par DOI, arXiv ID, OpenAlex ID puis titre et année, provenance de chaque résultat.
 - Journal des recherches (`search-log.json`) : requête envoyée à chaque API, période,
@@ -272,6 +296,11 @@ de tes données de recherche.
 - Tri des publications (`included` / `excluded`) avec justification historisée.
 - Texte intégral : PDF arXiv puis versions libres d'OpenAlex, texte extrait page par page,
   stocké dans `knowledge/papers/` et protégé par son empreinte.
+- Lecture vérifiable : chaque page affichée par `fulltext show` est enregistrée ; le texte principal
+  (jusqu'aux références) de chaque publication incluse doit avoir été affiché en entier, et une preuve
+  ne cite qu'une page affichée (`fulltext status` donne la couverture).
+- Recherches plafonnées signalées par `corpus check` (à compléter jusqu'à 300 résultats annoncés) ;
+  une recherche contradictoire sans résultat ne compte pas.
 - Preuves `EV-xxx` vérifiées contre le texte, immuables, retirables avec une raison ;
   matrice de preuves `evidence-matrix.json`.
 - Contrôle des citations de `literature-review.md` et transitions `LITERATURE_REVIEW` /
@@ -319,9 +348,35 @@ de tes données de recherche.
   humaine dans un terminal interactif, `approve` → `COMPLETED`, `revise` → `SOLUTION_DESIGN` ;
   `gate-2.json`. Mêmes commandes `gate` que pour la Gate 1.
 
+**Sprint 4 — implémenté**
+- Reprise après interruption : `project resume` relit tout dans la base (état, étape, instructions de
+  la dernière décision de gate, blocages de chaque étape suivante) et signale les exports périmés
+  (`--repair` les régénère). Tests de reprise : nouvelle session, interruption avant l'export, au milieu
+  d'une transaction ou d'une décision de gate.
+- `project transition --force` : n'importe quel état sans précondition, hors gates, tracé dans l'historique.
+- Évaluation de la qualité scientifique (`eval`) : `eval report <id>` calcule des indicateurs Q1 à Q5, revue
+  et workflow (identifiants, provenance, citations, lecture, recherches contradictoires, hypothèses testées,
+  limites, verdict, transitions forcées) ; ils mesurent ce qui est vérifiable, pas la valeur scientifique.
+  `eval rate <id>` : notation humaine des gaps retenus et des hypothèses selon la grille de
+  `research-policy.yaml` (terminal interactif, refusée à un agent comme les gates) ; `human-evaluation.json`.
+  `eval summary` : sujets évalués par un humain (cible du MVP : 3) et moyennes par critère.
+- Suivi des coûts (`costs`) : `costs sync` lit les transcriptions de Claude Code (jetons de chaque réponse
+  du modèle) et les conserve dans la base, une seule fois par réponse ; un hook le lance à la fin de chaque
+  sous-agent et de chaque session. `costs report [<id>]` : coût en équivalent API (prix de
+  `config/costs.yaml`) par agent, état du workflow et modèle. Seuls les agents de recherche sont attribués
+  à un projet ; le développement du laboratoire est compté à part (`main`).
+- Non-régression (`tests/regression/`) : une migration publiée ne change plus ; toute base, à n'importe
+  quelle version du schéma, se met à jour ; le scénario complet (du sujet à la Gate 2) produit les mêmes
+  livrables et sorties de contrôle que les références de `golden/` ; les instantanés `fixtures/snapshot-vN/`
+  d'anciennes versions restent lisibles, exports identiques et validations vérifiables. Après un changement
+  voulu : `UPDATE_GOLDEN=1 .venv/bin/pytest tests/regression`, puis relire le diff ; après une migration,
+  ajouter un instantané avec `REGRESSION_SNAPSHOT=1`.
+- `db backup <dossier>` : sauvegarde cohérente de la base, des textes intégraux et des dossiers des projets.
+- Procédures d'exploitation : [docs/exploitation.md](docs/exploitation.md).
+
 **Non implémenté**
 - Connecteurs Semantic Scholar et Crossref ; vérification de l'existence des DOI auprès de Crossref.
 - En `LITERATURE_REVIEW`, plus de nouvelle recherche bibliographique ; en `GAP_ANALYSIS`, seulement
   des recherches contradictoires. Le retour à `LITERATURE_SEARCH` passe par `gate revise`.
 - Pas de décision `reject` aux gates : `revise` couvre le besoin.
-- `templates/gap-record.json`, suivi des coûts, évaluations : sprint 4.
+- `templates/gap-record.json` : sprint 4.

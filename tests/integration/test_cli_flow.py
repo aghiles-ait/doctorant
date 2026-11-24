@@ -137,6 +137,13 @@ def test_literature_review_flow(project_ready, apis, lab_root):
     assert refused.exit_code == 1 and "NEEDS_MORE_RESEARCH" in refused.output
     policy_file = lab_root / "config" / "research-policy.yaml"
     policy_file.write_text(policy_file.read_text().replace("min_corpus_size: 20", "min_corpus_size: 3"))
+    # Les réponses enregistrées annoncent plus de résultats que ceux examinés : recherche à compléter.
+    capped = invoke("corpus", "check", PROJECT)
+    assert capped.exit_code == 0 and "NEEDS_MORE_RESEARCH" in capped.output and "--max-results" in capped.output
+    assert invoke("project", "transition", PROJECT, "LITERATURE_REVIEW").exit_code == 1
+    # Au-delà de max_examinable_results, la requête est jugée trop large : simple avertissement.
+    policy_file.write_text(policy_file.read_text().replace("max_examinable_results: 300", "max_examinable_results: 1"))
+    assert "requête trop large" in invoke("corpus", "check", PROJECT).output
     assert invoke("project", "transition", PROJECT, "LITERATURE_REVIEW").exit_code == 0
 
     papers = {p["arxiv_id"] or p["openalex_id"]: p["paper_id"] for p in json.loads(invoke("corpus", "list", PROJECT, "--json").output)}
@@ -153,6 +160,11 @@ def test_literature_review_flow(project_ready, apis, lab_root):
     )
     fetched = invoke("fulltext", "fetch", PROJECT)
     assert fetched.exit_code == 0 and "1 available" in fetched.output
+    outline = invoke("fulltext", "show", PROJECT, dam).output
+    assert "0/2 pages du texte principal lues" in outline and "Decentralized Autonomous Machines" in outline
+    early = invoke("evidence", "add", PROJECT, "--paper", dam, "--claim", "x", "--type", "position",
+                   "--quote", "extend autonomy into the physical world", "--page", "2")
+    assert early.exit_code == 1 and "jamais affichée" in early.output
     assert "page 2/2" in invoke("fulltext", "show", PROJECT, dam, "--page", "2").output
 
     invented = invoke("evidence", "add", PROJECT, "--paper", dam, "--claim", "x", "--type", "position",
@@ -167,12 +179,19 @@ def test_literature_review_flow(project_ready, apis, lab_root):
     assert invoke("review", "check", PROJECT).exit_code == 2
     assert invoke("project", "transition", PROJECT, "GAP_ANALYSIS").exit_code == 1
     review.write_text(f"# État de l'art\nLes DAM étendent l'autonomie [{dam}, EV-001].\n")
+    unread = invoke("review", "check", PROJECT)  # page 1 jamais affichée
+    assert unread.exit_code == 2 and "jamais affichées : 1" in unread.output
+    assert invoke("project", "transition", PROJECT, "GAP_ANALYSIS").exit_code == 1
+    assert "page 1/2" in invoke("fulltext", "show", PROJECT, dam, "--pages", "1-2").output
+    assert "1/1 textes intégraux disponibles lus en entier" in invoke("fulltext", "status", PROJECT).output
     assert invoke("review", "check", PROJECT).exit_code == 0
     assert invoke("project", "transition", PROJECT, "GAP_ANALYSIS").exit_code == 0
 
     matrix = json.loads((project_ready / "evidence-matrix.json").read_text())
     assert matrix == [{
         "paper_id": dam, "title": matrix[0]["title"], "year": 2025, "fulltext_status": "available",
+        "reading": {"page_count": 2, "main_pages": 2, "references_from": None, "pages_read": [1, 2],
+                    "unread_main_pages": [], "complete": True},
         "evidence": [{"evidence_id": "EV-001", "evidence_type": "position", "claim": "Les DAM étendent l'autonomie au monde physique",
                       "quote": "extend autonomy into the physical world", "location": "full_text", "page": 2}],
     }]
@@ -384,3 +403,43 @@ def test_corpus_list_and_show(project_ready, apis):
     shown = json.loads(invoke("corpus", "show", PROJECT, "PAPER-001").output)
     assert shown["paper_id"] == "PAPER-001"
     assert invoke("corpus", "show", PROJECT, "PAPER-999").exit_code == 1
+
+
+def test_evaluation_flow(project_ready, apis, lab_root, tmp_path, monkeypatch):
+    """Sprint 4 : indicateurs, notation humaine interactive, synthèse tous projets."""
+    from research_lab import cli
+    real_check = cli.human_check_failure
+    test_problem_formulation_flow(project_ready, apis, lab_root, tmp_path, monkeypatch)  # GAP-001, RQ-001/H1
+
+    report = invoke("eval", "report", PROJECT)
+    assert report.exit_code == 0 and "hypothèses avec critère de réfutation : 1/1" in report.output
+    assert "0/2 gaps et hypothèses notés" in report.output
+
+    monkeypatch.setattr(cli, "human_check_failure", real_check)
+    refused = invoke("eval", "rate", PROJECT)
+    assert refused.exit_code == 1 and "Évaluation refusée" in refused.output  # pas de terminal
+    monkeypatch.setattr(cli, "human_check_failure", lambda: None)
+
+    # GAP-001 : 3 critères et un commentaire (une note hors échelle redemandée) ; H1 passée.
+    rated = runner.invoke(app, ["eval", "rate", PROJECT], input="4\n9\n3\n5\nManque réel\n\nRAS\n")
+    assert rated.exit_code == 0, rated.output
+    assert "EVAL-001 : 1 notes enregistrées" in rated.output
+    [session] = json.loads((project_ready / "human-evaluation.json").read_text())
+    assert session["ratings"][0]["scores"] == {"reality": 4, "evidence": 3, "importance": 5}
+    assert "1/2 gaps et hypothèses notés" in invoke("eval", "report", PROJECT).output
+
+    summary = json.loads(invoke("eval", "summary", "--json").output)
+    assert (list(summary["rated_projects"]), summary["target_met"]) == ([PROJECT], False)
+
+
+def test_backup_copies_database_fulltexts_and_projects(project_ready, apis, lab_root, tmp_path):
+    from research_lab.storage.database import SCHEMA_VERSION, Database
+    assert _search().exit_code == 0
+    target = tmp_path / "backup"
+    result = invoke("db", "backup", str(target))
+    assert result.exit_code == 0 and f"schéma v{SCHEMA_VERSION}" in result.output, result.output
+    copy = Database(target / "knowledge" / "research.db")
+    assert copy.conn.execute("SELECT COUNT(*) FROM papers").fetchone()[0] > 0
+    assert (target / "research" / "projects" / PROJECT / "scope.md").exists()
+    assert invoke("db", "backup", str(target)).exit_code == 1  # jamais par-dessus une sauvegarde
+

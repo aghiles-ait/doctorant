@@ -1,0 +1,47 @@
+[
+  {
+    "rank": 1,
+    "gap_id": "GAP-001",
+    "title": "Sécurité des DAM non évaluée",
+    "status": "candidate",
+    "evidence_strength": "low",
+    "alignment_score": 0.6,
+    "priority_score": 0.3,
+    "stale": false,
+    "alignment": {
+      "scores": {
+        "privacy": {
+          "score": 3,
+          "justification": "j"
+        },
+        "freedom": {
+          "score": 3,
+          "justification": "j"
+        },
+        "sovereignty": {
+          "score": 3,
+          "justification": "j"
+        },
+        "governance": {
+          "score": 3,
+          "justification": "j"
+        },
+        "decentralization": {
+          "score": 3,
+          "justification": "j"
+        },
+        "verifiability": {
+          "score": 3,
+          "justification": "j"
+        }
+      },
+      "tradeoffs": [],
+      "gap_version": 1,
+      "alignment_score": 0.6,
+      "priority_score": 0.3,
+      "values_hash": "sha256:<sha256>",
+      "actor": "<user>",
+      "at": "<datetime>"
+    }
+  }
+]

@@ -1,5 +1,6 @@
 """Opérations de l'analyse des gaps (skill gap-analysis) et de l'alignement sur les valeurs (skill values-alignment)."""
 
+from research_lab.reading import check_reading
 from research_lab.config import Settings
 from research_lab.schemas.gap import ACTIVE_GAP_STATUSES, Alignment, AlignmentDraft, Gap, GapDraft
 from research_lab.schemas.paper import PaperStatus
@@ -92,7 +93,7 @@ def set_alignment(
 
 
 def check_gaps(repo: ProjectRepository, settings: Settings) -> GapCheck:
-    return check_gap_analysis(
+    check = check_gap_analysis(
         repo.load_gaps(),
         repo.load_evidence(),
         repo.searches_by_gap(),
@@ -101,3 +102,9 @@ def check_gaps(repo: ProjectRepository, settings: Settings) -> GapCheck:
         min_supporting_papers=settings.policy.min_supporting_papers,
         values_hash=settings.values_hash(),
     )
+    # Publications incluses pendant l'analyse (recherches contradictoires) : même exigence de lecture.
+    if settings.policy.require_full_reading:
+        if unread := check_reading(repo.reading_coverage().values(), repo.project_id):
+            check.errors.extend(f"lecture incomplète : {e}" for e in unread)
+            check.status = "BLOCKED"
+    return check

@@ -69,8 +69,14 @@ def _alignment(score: int | None = 4, **overrides) -> AlignmentDraft:
     return AlignmentDraft.model_validate({"scores": scores | overrides, "tradeoffs": ["vérifiabilité contre confidentialité"]})
 
 
+# Publication déjà au corpus (PAPER-002) : la recherche ramène un résultat sans ajouter de candidat à trier.
+KNOWN_HIT = SourceHit(source=Source.OPENALEX, source_id="W1", metadata=PaperMetadata(
+    title="Closed access paper", openalex_id="W1", abstract="An abstract about something else entirely."))
+
+
 def _contradictory_search(repo, settings, gap_id: str, hits: list[SourceHit] | None = None):
-    return run_search(repo, settings, [FakeProvider(hits or [])], SearchQuery(text="verifiable accountability"), gap_id=gap_id)
+    hits = [KNOWN_HIT] if hits is None else hits
+    return run_search(repo, settings, [FakeProvider(hits)], SearchQuery(text="verifiable accountability"), gap_id=gap_id)
 
 
 NEW_HIT = SourceHit(source=Source.OPENALEX, source_id="W9", metadata=PaperMetadata(
@@ -249,7 +255,7 @@ def test_gap_check(analysis, settings):
     set_alignment(analysis, settings, "GAP-001", _alignment(), "alice")
     result = check_gaps(analysis, settings)
     assert result.status == "NEEDS_MORE_RESEARCH"  # aucun gap supported
-    assert "GAP-001 : aucune recherche contradictoire (Q3), nouveauté non vérifiée" in result.warnings
+    assert "GAP-001 : aucune recherche contradictoire ayant ramené des résultats (Q3), nouveauté non vérifiée" in result.warnings
 
     _contradictory_search(analysis, settings, "GAP-001")
     revise_gap(analysis, settings, "GAP-001", _draft(status="supported"), "recherche contradictoire faite", "alice")

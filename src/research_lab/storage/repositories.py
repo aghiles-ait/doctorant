@@ -20,6 +20,7 @@ from pydantic import TypeAdapter
 from research_lab.config import PolicyConfig
 from research_lab.corpus import check_corpus
 from research_lab.schemas.critique import ObjectionResponse, ScientificReview
+from research_lab.schemas.evaluation import RatingSession
 from research_lab.schemas.evidence import Evidence, FulltextRecord, FulltextStatus
 from research_lab.schemas.gap import Alignment, Gap, GapDraft
 from research_lab.schemas.gate import Gate, GateDecision, GateDecisionType, GateSubmission
@@ -29,12 +30,13 @@ from research_lab.schemas.question import QuestionDraft, ResearchQuestion
 from research_lab.schemas.solution import Comparison, Solution, SolutionDraft
 from research_lab.schemas.search import SearchExecution
 from research_lab.storage.database import Database
+from research_lab.reading import Coverage, check_reading, coverage
 from research_lab.validation.outputs import check_literature_review
 from research_lab.validation.questions import check_problem_formulation
 from research_lab.validation.critique import unanswered_objections
 from research_lab.validation.solutions import check_solution_design
 from research_lab.workflow.state import ResearchState
-from research_lab.workflow.transitions import ProjectFacts, check_transition
+from research_lab.workflow.transitions import ProjectFacts, check_forced_transition, check_transition
 
 _PAPERS = TypeAdapter(list[Paper])
 _SEARCH_LOG = TypeAdapter(list[SearchExecution])
@@ -153,8 +155,8 @@ def _insert_search(conn: sqlite3.Connection, execution: SearchExecution) -> None
 
 def _insert_state_change(conn: sqlite3.Connection, project_id: str, change: StateChange) -> None:
     conn.execute(
-        "INSERT INTO state_changes (project_id, from_state, to_state, at, actor) VALUES (?, ?, ?, ?, ?)",
-        (project_id, change.from_state, change.to_state, change.at.isoformat(), change.actor),
+        "INSERT INTO state_changes (project_id, from_state, to_state, at, actor, forced) VALUES (?, ?, ?, ?, ?, ?)",
+        (project_id, change.from_state, change.to_state, change.at.isoformat(), change.actor, change.forced),
     )
 
 
@@ -210,6 +212,20 @@ def next_objection_id(db: Database) -> str:
     return f"OBJ-{highest + 1:03d}"
 
 
+def next_rating_session_id(db: Database) -> str:
+    row = db.conn.execute(
+        "SELECT session_id FROM rating_sessions ORDER BY CAST(substr(session_id, 6) AS INTEGER) DESC LIMIT 1"
+    ).fetchone()
+    highest = int(row["session_id"].split("-")[1]) if row else 0
+    return f"EVAL-{highest + 1:03d}"
+
+
+def load_all_rating_sessions(db: Database) -> list[RatingSession]:
+    """Évaluations humaines de tous les projets (synthèse : nombre de sujets évalués)."""
+    rows = db.conn.execute("SELECT record FROM rating_sessions ORDER BY rowid")
+    return [RatingSession.model_validate_json(r["record"]) for r in rows]
+
+
 # --- Texte intégral (partagé entre projets, fichiers dans knowledge/papers/) ----------
 
 
@@ -262,10 +278,12 @@ def read_pages(db: Database, papers_dir: Path, paper_id: str) -> tuple[list[str]
 
 
 class ProjectRepository:
-    def __init__(self, db: Database, projects_dir: Path, project_id: str) -> None:
+    def __init__(self, db: Database, projects_dir: Path, project_id: str, papers_dir: Path | None = None) -> None:
         self.db = db
         self.project_id = project_id
         self.dir = projects_dir / project_id
+        # Même disposition que Settings : <racine>/research/projects et <racine>/knowledge/papers.
+        self.papers_dir = papers_dir or projects_dir.parent.parent / "knowledge" / "papers"
 
     @property
     def project_file(self) -> Path:
@@ -321,7 +339,7 @@ class ProjectRepository:
         if row is None:
             raise ProjectNotFound(f"Projet introuvable dans la base : {self.project_id}")
         history = self.db.conn.execute(
-            "SELECT from_state, to_state, at, actor FROM state_changes WHERE project_id = ? ORDER BY rowid",
+            "SELECT from_state, to_state, at, actor, forced FROM state_changes WHERE project_id = ? ORDER BY rowid",
             (self.project_id,),
         ).fetchall()
         return Project.model_validate({**dict(row), "history": [dict(h) for h in history]})
@@ -345,12 +363,16 @@ class ProjectRepository:
         review_text = review_file.read_text(encoding="utf-8") if review_file.exists() else None
         return ProjectFacts(
             project_dir=self.dir,
-            corpus_status=check_corpus(papers, self.load_search_log(), policy.min_corpus_size).status,
+            corpus_status=check_corpus(
+                papers, self.load_search_log(), policy.min_corpus_size, policy.max_examinable_results
+            ).status,
             candidate_count=sum(p.status == PaperStatus.CANDIDATE for p in papers),
             included_count=len(included),
             without_fulltext_attempt=[p.paper_id for p in included if p.paper_id not in attempted],
             active_evidence_count=sum(e.active for e in evidence),
             review_errors=check_literature_review(review_text, papers, evidence).errors,
+            unread_fulltexts=check_reading(self.reading_coverage().values(), self.project_id)
+            if policy.require_full_reading else [],
             question_errors=check_problem_formulation(questions, self.approved_gaps(), evidence).errors,
             solution_errors=check_solution_design(
                 questions, self.load_solutions(), self.load_comparisons(), evidence, policy.min_solution_alternatives
@@ -363,10 +385,14 @@ class ProjectRepository:
             unanswered_objections=unanswered_objections(latest_review, self.load_responses()),
         )
 
-    def transition(self, target: ResearchState, actor: str, policy: PolicyConfig) -> Project:
+    def transition(self, target: ResearchState, actor: str, policy: PolicyConfig, force: bool = False) -> Project:
+        """Change d'état ; `force` saute les préconditions (pas le contrôle humain des gates)."""
         project = self.load_project()
-        check_transition(project.state, target, self.facts(policy))
-        change = StateChange(from_state=project.state, to_state=target, at=now(), actor=actor)
+        if force:
+            check_forced_transition(project.state, target)
+        else:
+            check_transition(project.state, target, self.facts(policy))
+        change = StateChange(from_state=project.state, to_state=target, at=now(), actor=actor, forced=force)
         with self.db.transaction() as conn:
             self._apply_state_change(conn, change)
         self.export()
@@ -482,6 +508,41 @@ class ProjectRepository:
         self.export()
 
     # --- Gaps -------------------------------------------------------------------------
+
+    # --- Lecture du texte intégral ---------------------------------------------------------
+
+    def record_page_reads(self, paper_id: str, pages: list[int], text_sha256: str) -> None:
+        """Enregistre les pages affichées par `fulltext show` (la première date d'affichage est conservée)."""
+        at = now().isoformat()
+        with self.db.transaction() as conn:
+            conn.executemany(
+                "INSERT OR IGNORE INTO page_reads (project_id, paper_id, page, text_sha256, first_shown_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                [(self.project_id, paper_id, page, text_sha256, at) for page in pages],
+            )
+
+    def pages_read(self, paper_id: str, text_sha256: str) -> set[int]:
+        rows = self.db.conn.execute(
+            "SELECT page FROM page_reads WHERE project_id = ? AND paper_id = ? AND text_sha256 = ?",
+            (self.project_id, paper_id, text_sha256),
+        )
+        return {r["page"] for r in rows}
+
+    def paper_coverage(self, paper_id: str) -> Coverage | None:
+        """Couverture de lecture d'une publication, ou None sans texte intégral disponible."""
+        record = load_fulltext(self.db, paper_id)
+        if record is None or record.status != FulltextStatus.AVAILABLE:
+            return None
+        pages, digest = read_pages(self.db, self.papers_dir, paper_id)
+        return coverage(paper_id, pages, self.pages_read(paper_id, digest))
+
+    def reading_coverage(self) -> dict[str, Coverage]:
+        """Couverture de lecture des publications incluses dont le texte intégral est disponible."""
+        result = {}
+        for paper in self.load_papers():
+            if paper.status == PaperStatus.INCLUDED and (c := self.paper_coverage(paper.paper_id)) is not None:
+                result[paper.paper_id] = c
+        return result
 
     def _gap_versions(self, where: str, params: tuple) -> list[Gap]:
         rows = self.db.conn.execute(
@@ -716,6 +777,22 @@ class ProjectRepository:
             )
         self.export()
 
+    # --- Évaluation humaine ------------------------------------------------------------
+
+    def load_rating_sessions(self) -> list[RatingSession]:
+        rows = self.db.conn.execute(
+            "SELECT record FROM rating_sessions WHERE project_id = ? ORDER BY rowid", (self.project_id,)
+        )
+        return [RatingSession.model_validate_json(r["record"]) for r in rows]
+
+    def record_rating_session(self, session: RatingSession) -> None:
+        with self.db.transaction() as conn:
+            conn.execute(
+                "INSERT INTO rating_sessions (session_id, project_id, rater, at, record) VALUES (?, ?, ?, ?, ?)",
+                (session.session_id, self.project_id, session.rater, session.at.isoformat(), session.model_dump_json()),
+            )
+        self.export()
+
     # --- Gates -----------------------------------------------------------------------
 
     def load_gate_submissions(self, gate: Gate) -> list[GateSubmission]:
@@ -870,11 +947,13 @@ class ProjectRepository:
             if paper.status != PaperStatus.INCLUDED:
                 continue
             fulltext = load_fulltext(self.db, paper.paper_id)
+            reading = self.paper_coverage(paper.paper_id)
             matrix.append({
                 "paper_id": paper.paper_id,
                 "title": paper.title,
                 "year": paper.published.year if paper.published else None,
                 "fulltext_status": fulltext.status if fulltext else None,
+                "reading": reading.as_dict() if reading else None,
                 "evidence": [
                     e.model_dump(mode="json", include={"evidence_id", "evidence_type", "claim", "quote", "location", "page"})
                     for e in evidence if e.paper_id == paper.paper_id
@@ -882,33 +961,41 @@ class ProjectRepository:
             })
         return matrix
 
-    def export(self) -> None:
+    def export_contents(self) -> dict[str, str]:
+        """Contenu attendu de chaque fichier exporté, calculé depuis la base."""
+        dump = lambda content: json.dumps(content, indent=2, ensure_ascii=False) + "\n"  # noqa: E731
         project = self.load_project()
-        _atomic_write(
-            self.project_file,
-            yaml.safe_dump(project.model_dump(mode="json"), allow_unicode=True, sort_keys=False),
-        )
-        _atomic_write(self.papers_file, _PAPERS.dump_json(self.load_papers(), indent=2).decode() + "\n")
-        _atomic_write(self.search_log_file, _SEARCH_LOG.dump_json(self.load_search_log(), indent=2).decode() + "\n")
-        _atomic_write(
-            self.dir / "evidence-matrix.json",
-            json.dumps(self.evidence_matrix(), indent=2, ensure_ascii=False) + "\n",
-        )
-        for name, content in (("gaps.json", self.gaps_export()), ("alignment.json", self.alignment_export())):
-            _atomic_write(self.dir / name, json.dumps(content, indent=2, ensure_ascii=False) + "\n")
+        contents = {
+            self.project_file.name: yaml.safe_dump(project.model_dump(mode="json"), allow_unicode=True, sort_keys=False),
+            self.papers_file.name: _PAPERS.dump_json(self.load_papers(), indent=2).decode() + "\n",
+            self.search_log_file.name: _SEARCH_LOG.dump_json(self.load_search_log(), indent=2).decode() + "\n",
+            "evidence-matrix.json": dump(self.evidence_matrix()),
+            "gaps.json": dump(self.gaps_export()),
+            "alignment.json": dump(self.alignment_export()),
+        }
         for gate, name in ((Gate.GATE_1, "gate-1.json"), (Gate.GATE_2, "gate-2.json")):
             if rounds := self.gate_export(gate):
-                _atomic_write(self.dir / name, json.dumps(rounds, indent=2, ensure_ascii=False) + "\n")
+                contents[name] = dump(rounds)
         if questions := self.questions_export():
-            _atomic_write(
-                self.dir / "research-questions.json", json.dumps(questions, indent=2, ensure_ascii=False) + "\n"
-            )
+            contents["research-questions.json"] = dump(questions)
         if self.load_solutions():
-            _atomic_write(
-                self.dir / "solutions.json", json.dumps(self.solutions_export(), indent=2, ensure_ascii=False) + "\n"
-            )
+            contents["solutions.json"] = dump(self.solutions_export())
         if reviews := self.critique_export():
-            _atomic_write(self.dir / "scientific-review.json", json.dumps(reviews, indent=2, ensure_ascii=False) + "\n")
+            contents["scientific-review.json"] = dump(reviews)
+        if sessions := self.load_rating_sessions():
+            contents["human-evaluation.json"] = dump([x.model_dump(mode="json") for x in sessions])
+        return contents
+
+    def export(self) -> None:
+        for name, content in self.export_contents().items():
+            _atomic_write(self.dir / name, content)
+
+    def stale_exports(self) -> list[str]:
+        """Exports absents ou différents de la base (interruption entre l'écriture et l'export, modification à la main)."""
+        return [
+            name for name, content in self.export_contents().items()
+            if not (self.dir / name).exists() or (self.dir / name).read_text(encoding="utf-8") != content
+        ]
 
 
 # --- Import des projets du sprint 1 (fichiers JSON/YAML) -------------------------
