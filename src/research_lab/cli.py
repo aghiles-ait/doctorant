@@ -1,5 +1,6 @@
 """Interface en ligne de commande `research-lab`, appelée par les Skills."""
 
+import dataclasses
 import getpass
 import json
 import sys
@@ -20,6 +21,7 @@ from research_lab.proposal import ProposalError, check_proposal_file, write_refe
 from research_lab.providers import build_providers
 from research_lab.questions import QuestionError, add_question, check_questions, revise_question
 from research_lab.reading import check_reading, coverage, outline, parse_page_range, select_pages
+from research_lab.resume import resume_report
 from research_lab.review import ReviewError, add_evidence, decide, fetch_fulltexts, withdraw_evidence
 from research_lab.schemas.evidence import EvidenceType, FulltextStatus
 from research_lab.schemas.paper import PaperStatus, Source
@@ -175,6 +177,35 @@ def project_status(project_id: ProjectId, as_json: JsonFlag = False) -> None:
         return
     typer.echo(f"Projet : {project.project_id}\nSujet  : {project.topic}\nÉtat   : {project.state}")
     typer.echo(f"Corpus : {len(papers)} publications, {len(log)} recherches journalisées")
+
+
+@project_app.command("resume")
+def project_resume(
+    project_id: ProjectId,
+    repair: Annotated[bool, typer.Option("--repair", help="Régénérer les exports périmés depuis la base")] = False,
+    as_json: JsonFlag = False,
+) -> None:
+    """Où reprendre un projet interrompu : état, étape, instructions humaines, ce qui bloque la suite."""
+    settings, repo = _context(project_id)
+    _require_project(repo)
+    if repair:
+        repo.export()
+    report = resume_report(repo, settings)
+    if as_json:
+        _print_json(dataclasses.asdict(report))
+        return
+    since = f" depuis {report.since.isoformat()}" if report.since else ""
+    typer.echo(f"Projet : {report.project_id}\nÉtat   : {report.state}{since}"
+               + (" (transition forcée)" if report.last_change_forced else ""))
+    typer.echo(f"Étape  : {report.step}\nAction : {report.action}")
+    if report.human_instructions:
+        typer.echo(f"Décision humaine : {report.human_instructions}")
+    for target, blockers in report.next_steps.items():
+        typer.echo(f"→ {target} : " + ("possible" if not blockers else "bloqué"))
+        for blocker in blockers:
+            typer.echo(f"    - {blocker}")
+    if report.stale_exports:
+        typer.echo(f"Exports périmés : {', '.join(report.stale_exports)} (`project resume {project_id} --repair`)")
 
 
 @project_app.command("transition")

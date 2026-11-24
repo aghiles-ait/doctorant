@@ -5,7 +5,7 @@ argumenté, traçable et reproductible. La spécification complète est dans `sp
 
 **Avancement : sprints 1 à 3 terminés** : workflow complet, du sujet au Research Proposal validé
 à la Gate 2 (base SQLite partagée, preuves vérifiées, gaps et valeurs, Gate 1, questions et
-hypothèses, solutions comparées, revue critique indépendante, Proposal, Gate 2). Sprint 4 non implémenté.
+hypothèses, solutions comparées, revue critique indépendante, Proposal, Gate 2). Sprint 4 en cours : reprise (`project resume`) faite.
 
 ## Principe d'architecture
 
@@ -36,7 +36,7 @@ Python ≥ 3.12, environnement dans `.venv/` (voir README.md pour l'installation
   `workflow/` (états, transitions et leurs préconditions sur `ProjectFacts` ; `approvals.py` :
   soumission et décision des gates), `corpus.py`,
   `watch.py` (recherche), `fulltext.py` (PDF en accès libre), `review.py` (tri, preuves),
-  `gaps.py` (gaps, alignement), `questions.py` (questions et hypothèses), `solutions.py` (solutions et comparaisons), `critique.py` (revue critique, réponses), `proposal.py` et `bibliography.py` (Proposal,
+  `gaps.py` (gaps, alignement), `resume.py` (reprise : `project resume`), `questions.py` (questions et hypothèses), `solutions.py` (solutions et comparaisons), `critique.py` (revue critique, réponses), `proposal.py` et `bibliography.py` (Proposal,
   `references.bib`), `cli.py`. `templates/research-proposal.md` : sections contrôlées par `proposal check`.
 - `validation/gaps.py` : règles déterministes des gaps (force des preuves, statut `supported`,
   nouveauté) et de l'évaluation au regard des valeurs, calcul des scores de priorité.

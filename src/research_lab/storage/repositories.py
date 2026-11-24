@@ -930,33 +930,39 @@ class ProjectRepository:
             })
         return matrix
 
-    def export(self) -> None:
+    def export_contents(self) -> dict[str, str]:
+        """Contenu attendu de chaque fichier exporté, calculé depuis la base."""
+        dump = lambda content: json.dumps(content, indent=2, ensure_ascii=False) + "\n"  # noqa: E731
         project = self.load_project()
-        _atomic_write(
-            self.project_file,
-            yaml.safe_dump(project.model_dump(mode="json"), allow_unicode=True, sort_keys=False),
-        )
-        _atomic_write(self.papers_file, _PAPERS.dump_json(self.load_papers(), indent=2).decode() + "\n")
-        _atomic_write(self.search_log_file, _SEARCH_LOG.dump_json(self.load_search_log(), indent=2).decode() + "\n")
-        _atomic_write(
-            self.dir / "evidence-matrix.json",
-            json.dumps(self.evidence_matrix(), indent=2, ensure_ascii=False) + "\n",
-        )
-        for name, content in (("gaps.json", self.gaps_export()), ("alignment.json", self.alignment_export())):
-            _atomic_write(self.dir / name, json.dumps(content, indent=2, ensure_ascii=False) + "\n")
+        contents = {
+            self.project_file.name: yaml.safe_dump(project.model_dump(mode="json"), allow_unicode=True, sort_keys=False),
+            self.papers_file.name: _PAPERS.dump_json(self.load_papers(), indent=2).decode() + "\n",
+            self.search_log_file.name: _SEARCH_LOG.dump_json(self.load_search_log(), indent=2).decode() + "\n",
+            "evidence-matrix.json": dump(self.evidence_matrix()),
+            "gaps.json": dump(self.gaps_export()),
+            "alignment.json": dump(self.alignment_export()),
+        }
         for gate, name in ((Gate.GATE_1, "gate-1.json"), (Gate.GATE_2, "gate-2.json")):
             if rounds := self.gate_export(gate):
-                _atomic_write(self.dir / name, json.dumps(rounds, indent=2, ensure_ascii=False) + "\n")
+                contents[name] = dump(rounds)
         if questions := self.questions_export():
-            _atomic_write(
-                self.dir / "research-questions.json", json.dumps(questions, indent=2, ensure_ascii=False) + "\n"
-            )
+            contents["research-questions.json"] = dump(questions)
         if self.load_solutions():
-            _atomic_write(
-                self.dir / "solutions.json", json.dumps(self.solutions_export(), indent=2, ensure_ascii=False) + "\n"
-            )
+            contents["solutions.json"] = dump(self.solutions_export())
         if reviews := self.critique_export():
-            _atomic_write(self.dir / "scientific-review.json", json.dumps(reviews, indent=2, ensure_ascii=False) + "\n")
+            contents["scientific-review.json"] = dump(reviews)
+        return contents
+
+    def export(self) -> None:
+        for name, content in self.export_contents().items():
+            _atomic_write(self.dir / name, content)
+
+    def stale_exports(self) -> list[str]:
+        """Exports absents ou différents de la base (interruption entre l'écriture et l'export, modification à la main)."""
+        return [
+            name for name, content in self.export_contents().items()
+            if not (self.dir / name).exists() or (self.dir / name).read_text(encoding="utf-8") != content
+        ]
 
 
 # --- Import des projets du sprint 1 (fichiers JSON/YAML) -------------------------

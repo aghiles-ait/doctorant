@@ -36,6 +36,8 @@ $L project transition decentralized-ai-governance LITERATURE_SEARCH
 # développement : n'importe quel état, en avant ou en arrière, sans précondition (hors gates) ;
 # la transition est marquée `forced` dans l'historique
 $L project transition decentralized-ai-governance SOLUTION_DESIGN --force
+# reprise après interruption : état, étape, instructions humaines, blocages, exports périmés
+$L project resume decentralized-ai-governance [--repair]
 
 $L watch search decentralized-ai-governance -q '"AI governance" decentralized' --from 2022-01-01 --to 2026-10-26
 $L corpus list decentralized-ai-governance
@@ -329,6 +331,13 @@ de tes données de recherche.
 - Soumission du Proposal (empreintes des livrables, versions des questions et solutions), décision
   humaine dans un terminal interactif, `approve` → `COMPLETED`, `revise` → `SOLUTION_DESIGN` ;
   `gate-2.json`. Mêmes commandes `gate` que pour la Gate 1.
+
+**Sprint 4 — en cours**
+- Reprise après interruption : `project resume` relit tout dans la base (état, étape, instructions de
+  la dernière décision de gate, blocages de chaque étape suivante) et signale les exports périmés
+  (`--repair` les régénère). Tests de reprise : nouvelle session, interruption avant l'export, au milieu
+  d'une transaction ou d'une décision de gate.
+- `project transition --force` : n'importe quel état sans précondition, hors gates, tracé dans l'historique.
 
 **Non implémenté**
 - Connecteurs Semantic Scholar et Crossref ; vérification de l'existence des DOI auprès de Crossref.

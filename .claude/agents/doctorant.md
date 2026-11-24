@@ -75,7 +75,10 @@ The workflow state is enforced by the `research-lab` CLI, not by you. Always use
 (they are regenerated from `knowledge/research.db`).
 
 To resume an interrupted project, start with
-`.venv/bin/research-lab project status <project-id>` and continue from its state:
+`.venv/bin/research-lab project resume <project-id>`: it reads the state from the database and
+reports the current step, the instructions of the last gate decision, what blocks each next
+step, and exports out of date with the database (`--repair` regenerates them). Then continue
+from its state:
 `SCOPING` → step 1, `LITERATURE_SEARCH` → step 2, `LITERATURE_REVIEW` → step 3,
 `GAP_ANALYSIS` → steps 4 and 5 (`gap list` and `gap check` show what remains),
 `AWAITING_GATE_1` or `AWAITING_GATE_2` → wait for the human decision,
