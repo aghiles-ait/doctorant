@@ -34,7 +34,7 @@ from research_lab.validation.questions import check_problem_formulation
 from research_lab.validation.critique import unanswered_objections
 from research_lab.validation.solutions import check_solution_design
 from research_lab.workflow.state import ResearchState
-from research_lab.workflow.transitions import ProjectFacts, check_transition
+from research_lab.workflow.transitions import ProjectFacts, check_forced_transition, check_transition
 
 _PAPERS = TypeAdapter(list[Paper])
 _SEARCH_LOG = TypeAdapter(list[SearchExecution])
@@ -153,8 +153,8 @@ def _insert_search(conn: sqlite3.Connection, execution: SearchExecution) -> None
 
 def _insert_state_change(conn: sqlite3.Connection, project_id: str, change: StateChange) -> None:
     conn.execute(
-        "INSERT INTO state_changes (project_id, from_state, to_state, at, actor) VALUES (?, ?, ?, ?, ?)",
-        (project_id, change.from_state, change.to_state, change.at.isoformat(), change.actor),
+        "INSERT INTO state_changes (project_id, from_state, to_state, at, actor, forced) VALUES (?, ?, ?, ?, ?, ?)",
+        (project_id, change.from_state, change.to_state, change.at.isoformat(), change.actor, change.forced),
     )
 
 
@@ -321,7 +321,7 @@ class ProjectRepository:
         if row is None:
             raise ProjectNotFound(f"Projet introuvable dans la base : {self.project_id}")
         history = self.db.conn.execute(
-            "SELECT from_state, to_state, at, actor FROM state_changes WHERE project_id = ? ORDER BY rowid",
+            "SELECT from_state, to_state, at, actor, forced FROM state_changes WHERE project_id = ? ORDER BY rowid",
             (self.project_id,),
         ).fetchall()
         return Project.model_validate({**dict(row), "history": [dict(h) for h in history]})
@@ -363,10 +363,14 @@ class ProjectRepository:
             unanswered_objections=unanswered_objections(latest_review, self.load_responses()),
         )
 
-    def transition(self, target: ResearchState, actor: str, policy: PolicyConfig) -> Project:
+    def transition(self, target: ResearchState, actor: str, policy: PolicyConfig, force: bool = False) -> Project:
+        """Change d'état ; `force` saute les préconditions (pas le contrôle humain des gates)."""
         project = self.load_project()
-        check_transition(project.state, target, self.facts(policy))
-        change = StateChange(from_state=project.state, to_state=target, at=now(), actor=actor)
+        if force:
+            check_forced_transition(project.state, target)
+        else:
+            check_transition(project.state, target, self.facts(policy))
+        change = StateChange(from_state=project.state, to_state=target, at=now(), actor=actor, forced=force)
         with self.db.transaction() as conn:
             self._apply_state_change(conn, change)
         self.export()

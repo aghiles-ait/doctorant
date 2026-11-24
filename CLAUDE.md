@@ -5,7 +5,7 @@ argumenté, traçable et reproductible. La spécification complète est dans `sp
 
 **Avancement : sprints 1 à 3 terminés** : workflow complet, du sujet au Research Proposal validé
 à la Gate 2 (base SQLite partagée, preuves vérifiées, gaps et valeurs, Gate 1, questions et
-hypothèses, solutions comparées, revue critique indépendante, Proposal, Gate 2). Sprint 4 non implémenté. Sprint 4 non implémenté.
+hypothèses, solutions comparées, revue critique indépendante, Proposal, Gate 2). Sprint 4 non implémenté.
 
 ## Principe d'architecture
 
@@ -67,7 +67,8 @@ Python ≥ 3.12, environnement dans `.venv/` (voir README.md pour l'installation
   Une preuve ne se modifie pas : elle se retire (`evidence withdraw`) et une nouvelle est créée.
   Un gap, une question ou une solution se révise par une nouvelle version (`… revise`) ;
   les versions précédentes sont conservées.
-- Les transitions du workflow sont contrôlées par `workflow/transitions.py` ; les validations
+- Les transitions du workflow sont contrôlées par `workflow/transitions.py` (`--force` saute les
+  préconditions, sauf vers ou depuis les gates, et reste tracé dans l'historique) ; les validations
   humaines (Gate 1, Gate 2) ne doivent jamais pouvoir être effectuées par un agent : ne jamais
   lancer `gate approve` / `gate revise`, ni appeler `decide_gate_1` / `decide_gate_2`, ni contourner
   le contrôle `human_check_failure` (variable `CLAUDECODE`, terminal interactif). Les tests le simulent

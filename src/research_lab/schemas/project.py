@@ -12,6 +12,7 @@ class StateChange(BaseModel):
     to_state: ResearchState
     at: datetime
     actor: str
+    forced: bool = False  # transition forcée, sans contrôle des préconditions
 
 
 class Project(BaseModel):

@@ -180,12 +180,15 @@ def project_status(project_id: ProjectId, as_json: JsonFlag = False) -> None:
 def project_transition(
     project_id: ProjectId,
     target: Annotated[ResearchState, typer.Argument(help="État cible")],
+    force: Annotated[
+        bool, typer.Option("--force", help="N'importe quel état, sans précondition (hors gates) ; tracé dans l'historique")
+    ] = False,
 ) -> None:
     """Fait passer le projet à l'état suivant si les préconditions sont remplies."""
     settings, repo = _context(project_id)
     _require_project(repo)
     try:
-        project = repo.transition(target, actor=getpass.getuser(), policy=settings.policy)
+        project = repo.transition(target, actor=getpass.getuser(), policy=settings.policy, force=force)
     except TransitionError as exc:
         _fail(f"Transition refusée : {exc}")
     typer.echo(f"{project.project_id} : état {project.state}")

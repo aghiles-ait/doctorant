@@ -33,6 +33,9 @@ $L project init decentralized-ai-governance --topic "Decentralized AI governance
 $L project transition decentralized-ai-governance SCOPING
 # rédiger research/projects/decentralized-ai-governance/scope.md
 $L project transition decentralized-ai-governance LITERATURE_SEARCH
+# développement : n'importe quel état, en avant ou en arrière, sans précondition (hors gates) ;
+# la transition est marquée `forced` dans l'historique
+$L project transition decentralized-ai-governance SOLUTION_DESIGN --force
 
 $L watch search decentralized-ai-governance -q '"AI governance" decentralized' --from 2022-01-01 --to 2026-10-26
 $L corpus list decentralized-ai-governance

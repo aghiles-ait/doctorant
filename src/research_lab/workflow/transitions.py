@@ -3,6 +3,10 @@
 Chaque transition autorisée a une précondition qui examine l'état vérifiable du projet
 (`ProjectFacts`). Les transitions des gates passent par workflow/approvals.py ; les autres
 transitions non listées lèvent une erreur explicite.
+
+En développement, `project transition --force` permet d'aller vers n'importe quel état, en avant
+ou en arrière, sans précondition ; la transition est marquée `forced` dans l'historique. Les
+décisions des gates restent réservées à l'humain.
 """
 
 from collections.abc import Callable
@@ -131,3 +135,18 @@ def check_transition(current: S, target: S, facts: ProjectFacts) -> None:
         raise TransitionError(f"Transition {current} → {target} non autorisée (ou pas encore implémentée)")
     if (error := precondition(facts)) is not None:
         raise TransitionError(error)
+
+
+# États qu'une transition forcée ne peut ni quitter ni atteindre : la soumission à une gate fige un
+# dossier et seule la décision humaine en sort ; COMPLETED n'est atteint que par l'approbation de la Gate 2.
+_GATE_STATES = {S.AWAITING_GATE_1, S.AWAITING_GATE_2, S.COMPLETED}
+
+
+def check_forced_transition(current: S, target: S) -> None:
+    if target == current:
+        raise TransitionError(f"Le projet est déjà à l'état {current}")
+    if current in _GATE_STATES - {S.COMPLETED} or target in _GATE_STATES:
+        raise TransitionError(
+            f"Transition forcée {current} → {target} refusée : les gates restent décidées par un humain "
+            "(`research-lab gate submit`, puis `gate approve` ou `gate revise`)"
+        )

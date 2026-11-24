@@ -396,6 +396,10 @@ _MIGRATIONS: list[str] = [
     CREATE TRIGGER objection_responses_no_delete BEFORE DELETE ON objection_responses
     BEGIN SELECT RAISE(ABORT, 'l''historique des réponses est en ajout seul'); END;
     """,
+    # 8 — transitions forcées (`project transition --force`), signalées dans l'historique
+    """
+    ALTER TABLE state_changes ADD COLUMN forced INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)
