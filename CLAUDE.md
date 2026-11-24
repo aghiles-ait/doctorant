@@ -3,9 +3,10 @@
 Laboratoire de recherche assisté par IA : transformer un sujet en Research Proposal
 argumenté, traçable et reproductible. La spécification complète est dans `specs.md`.
 
-**Avancement : sprints 1 à 3 terminés** : workflow complet, du sujet au Research Proposal validé
+**Avancement : sprints 1 à 4 terminés** : workflow complet, du sujet au Research Proposal validé
 à la Gate 2 (base SQLite partagée, preuves vérifiées, gaps et valeurs, Gate 1, questions et
-hypothèses, solutions comparées, revue critique indépendante, Proposal, Gate 2). Sprint 4 en cours : reprise (`project resume`), évaluation (`eval`) coûts (`costs`) et non-régression (`tests/regression`) faits.
+hypothèses, solutions comparées, revue critique indépendante, Proposal, Gate 2). Sprint 4 terminé : reprise (`project resume`), évaluation (`eval`), coûts (`costs`),
+non-régression (`tests/regression`), sauvegarde (`db backup`), procédures (`docs/exploitation.md`).
 
 ## Principe d'architecture
 

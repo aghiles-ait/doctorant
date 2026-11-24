@@ -430,3 +430,15 @@ def test_evaluation_flow(project_ready, apis, lab_root, tmp_path, monkeypatch):
 
     summary = json.loads(invoke("eval", "summary", "--json").output)
     assert (list(summary["rated_projects"]), summary["target_met"]) == ([PROJECT], False)
+
+
+def test_backup_copies_database_fulltexts_and_projects(project_ready, apis, lab_root, tmp_path):
+    from research_lab.storage.database import SCHEMA_VERSION, Database
+    assert _search().exit_code == 0
+    target = tmp_path / "backup"
+    result = invoke("db", "backup", str(target))
+    assert result.exit_code == 0 and f"schéma v{SCHEMA_VERSION}" in result.output, result.output
+    copy = Database(target / "knowledge" / "research.db")
+    assert copy.conn.execute("SELECT COUNT(*) FROM papers").fetchone()[0] > 0
+    assert (target / "research" / "projects" / PROJECT / "scope.md").exists()
+    assert invoke("db", "backup", str(target)).exit_code == 1  # jamais par-dessus une sauvegarde

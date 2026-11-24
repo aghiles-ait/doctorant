@@ -53,7 +53,7 @@ COMMANDS = {
 
 def normalize(text: str, root: Path) -> str:
     text = text.replace(str(root), "<root>").replace(str(root.resolve()), "<root>")
-    text = re.sub(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?", "<datetime>", text)
+    text = re.sub(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?", "<datetime>", text)
     text = re.sub(r"\b[0-9a-f]{64}\b", "<sha256>", text)
     return re.sub(rf"\b{re.escape(getpass.getuser())}\b", "<user>", text)
 

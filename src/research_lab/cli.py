@@ -3,6 +3,8 @@
 import dataclasses
 import getpass
 import json
+import shutil
+import sqlite3
 import sys
 from datetime import date
 from pathlib import Path
@@ -1411,6 +1413,24 @@ def db_import_files(
         except (ImportConflict, ProjectNotFound, ValidationError) as exc:
             _fail(f"Import de {pid} refusé, base inchangée : {exc}")
         typer.echo(f"{pid} : {count} publications importées (originaux dans {pid}/migration-backup/)")
+
+
+@db_app.command("backup")
+def db_backup(
+    target: Annotated[Path, typer.Argument(help="Dossier de sauvegarde (créé ; doit être absent ou vide)")],
+) -> None:
+    """Sauvegarde cohérente du laboratoire : base, textes intégraux, dossiers des projets (non versionnés)."""
+    settings, db = _settings_and_db()
+    if target.exists() and any(target.iterdir()):
+        _fail(f"{target} n'est pas vide")
+    (target / "knowledge").mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(target / "knowledge" / "research.db") as copy:
+        db.conn.backup(copy)  # cohérent même si une autre commande écrit en même temps
+    for source, name in ((settings.papers_dir, "knowledge/papers"), (settings.projects_dir, "research/projects")):
+        if source.exists():
+            shutil.copytree(source, target / name, ignore=shutil.ignore_patterns("*.tmp"))
+    version = db.conn.execute("PRAGMA user_version").fetchone()[0]
+    typer.echo(f"Sauvegarde dans {target} (schéma v{version}) : knowledge/research.db, knowledge/papers, research/projects")
 
 
 @db_app.command("info")

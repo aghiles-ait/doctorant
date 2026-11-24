@@ -2,6 +2,8 @@
 
 Laboratoire de recherche scientifique assisté par IA, piloté depuis Claude Code.
 Spécification : [specs.md](specs.md).
+Procédures d'exploitation (suivre un projet, décisions humaines, déblocage, sauvegarde, coûts) :
+[docs/exploitation.md](docs/exploitation.md).
 
 ## Installation
 
@@ -338,7 +340,7 @@ de tes données de recherche.
   humaine dans un terminal interactif, `approve` → `COMPLETED`, `revise` → `SOLUTION_DESIGN` ;
   `gate-2.json`. Mêmes commandes `gate` que pour la Gate 1.
 
-**Sprint 4 — en cours**
+**Sprint 4 — implémenté**
 - Reprise après interruption : `project resume` relit tout dans la base (état, étape, instructions de
   la dernière décision de gate, blocages de chaque étape suivante) et signale les exports périmés
   (`--repair` les régénère). Tests de reprise : nouvelle session, interruption avant l'export, au milieu
@@ -361,6 +363,8 @@ de tes données de recherche.
   d'anciennes versions restent lisibles, exports identiques et validations vérifiables. Après un changement
   voulu : `UPDATE_GOLDEN=1 .venv/bin/pytest tests/regression`, puis relire le diff ; après une migration,
   ajouter un instantané avec `REGRESSION_SNAPSHOT=1`.
+- `db backup <dossier>` : sauvegarde cohérente de la base, des textes intégraux et des dossiers des projets.
+- Procédures d'exploitation : [docs/exploitation.md](docs/exploitation.md).
 
 **Non implémenté**
 - Connecteurs Semantic Scholar et Crossref ; vérification de l'existence des DOI auprès de Crossref.

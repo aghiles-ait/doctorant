@@ -1,5 +1,5 @@
 État : COMPLETED
-Gate 2, tour 1, soumis le 2026-11-24 13:06Z par <user>
+Gate 2, tour 1, soumis le <datetime> par <user>
 proposal check à la soumission : OK
 RQ-001  Q ?
     SOL-001  A
