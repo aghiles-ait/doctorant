@@ -198,7 +198,7 @@ def test_papers_found_by_contradictory_search_are_screened(analysis, settings):
     assert check_gaps(analysis, settings).errors[0] == "1 publications trouvées par les recherches contradictoires restent à trier"
     with pytest.raises(ReviewError, match="déjà trié"):
         decide(analysis, "PAPER-003", PaperStatus.INCLUDED, "relecture", "alice")
-    decide(analysis, new_paper, PaperStatus.INCLUDED, "Comble peut-être GAP-001", "alice")
+    decide(analysis, new_paper, PaperStatus.INCLUDED, "§2 — comble peut-être GAP-001", "alice")
 
     contrary = _evidence(analysis, settings, paper_id=new_paper, page=None, evidence_type=EvidenceType.METHOD,
                          quote="We already provide verifiable accountability", claim="Mécanisme existant")

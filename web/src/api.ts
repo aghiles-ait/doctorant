@@ -1,4 +1,4 @@
-import type { ProjectSummary, ProjectView, Workflow } from "./types";
+import type { Config, ProjectSummary, ProjectView, Workflow } from "./types";
 
 async function get<T>(url: string): Promise<T> {
   const response = await fetch(url);
@@ -8,6 +8,7 @@ async function get<T>(url: string): Promise<T> {
 
 export const api = {
   workflow: () => get<Workflow>("/api/workflow"),
+  config: () => get<Config>("/api/config"),
   projects: () => get<ProjectSummary[]>("/api/projects"),
   project: (id: string) => get<ProjectView>(`/api/projects/${encodeURIComponent(id)}`),
   document: (id: string, name: string) =>

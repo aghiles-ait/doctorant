@@ -24,7 +24,8 @@ def invoke(*args: str):
 def project_ready(lab_root):
     assert invoke("project", "init", PROJECT, "--topic", "Decentralized AI governance").exit_code == 0
     assert invoke("project", "transition", PROJECT, "SCOPING").exit_code == 0
-    (lab_root / "research" / "projects" / PROJECT / "scope.md").write_text("# Scope\nGouvernance décentralisée.\n")
+    (lab_root / "research" / "projects" / PROJECT / "scope.md").write_text(
+        "# Scope\n\n## 1. Question\nGouvernance décentralisée.\n\n## 2. Périmètre\nInclus : DAO, agents.\n")
     assert invoke("project", "transition", PROJECT, "LITERATURE_SEARCH").exit_code == 0
     return lab_root / "research" / "projects" / PROJECT
 
@@ -150,7 +151,7 @@ def test_literature_review_flow(project_ready, apis, lab_root):
     dam = papers["2504.15676"]
     for paper_id in papers.values():
         flag = "--include" if paper_id == dam else "--exclude"
-        result = invoke("corpus", "decide", PROJECT, paper_id, flag, "--reason", "critères de scope.md")
+        result = invoke("corpus", "decide", PROJECT, paper_id, flag, "--reason", "§2 — relève du périmètre de scope.md")
         assert result.exit_code == 0, result.output
     assert "0 publications restent à trier" in result.output
 

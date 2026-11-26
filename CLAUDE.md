@@ -37,7 +37,7 @@ Python ≥ 3.12, environnement dans `.venv/` (voir README.md pour l'installation
   `workflow/` (états, transitions et leurs préconditions sur `ProjectFacts` ; `approvals.py` :
   soumission et décision des gates), `corpus.py`,
   `watch.py` (recherche), `fulltext.py` (PDF en accès libre), `review.py` (tri, preuves),
-  `gaps.py` (gaps, alignement), `resume.py` (reprise : `project resume`), `evaluation.py` (indicateurs `eval report`, notation humaine `eval rate`), `costs.py` (coûts lus dans les transcriptions de Claude Code, `costs report` ; prix dans `config/costs.yaml`), `views.py` et `api.py` (API FastAPI en lecture seule pour l'interface web, `research-lab serve`), `questions.py` (questions et hypothèses), `solutions.py` (solutions et comparaisons), `critique.py` (revue critique, réponses), `proposal.py` et `bibliography.py` (Proposal,
+  `gaps.py` (gaps, alignement), `resume.py` (reprise : `project resume`), `scope.py` (sections numérotées de `scope.md`, raison de tri « §N — justification »), `evaluation.py` (indicateurs `eval report`, notation humaine `eval rate`), `costs.py` (coûts lus dans les transcriptions de Claude Code, `costs report` ; prix dans `config/costs.yaml`), `views.py` et `api.py` (API FastAPI en lecture seule pour l'interface web, `research-lab serve`), `questions.py` (questions et hypothèses), `solutions.py` (solutions et comparaisons), `critique.py` (revue critique, réponses), `proposal.py` et `bibliography.py` (Proposal,
   `references.bib`), `cli.py`. `templates/research-proposal.md` : sections contrôlées par `proposal check`.
 - `validation/gaps.py` : règles déterministes des gaps (force des preuves, statut `supported`,
   nouveauté) et de l'évaluation au regard des valeurs, calcul des scores de priorité.

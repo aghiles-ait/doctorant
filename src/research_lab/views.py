@@ -10,6 +10,7 @@ from research_lab.costs import cost_report, load_usage
 from research_lab.evaluation import quality_report
 from research_lab.proposal import PROPOSAL_FILE, check_proposal_file
 from research_lab.resume import resume_report
+from research_lab.scope import scope_sections
 from research_lab.schemas.gate import Gate
 from research_lab.schemas.paper import Paper, PaperStatus
 from research_lab.storage.database import Database
@@ -135,6 +136,8 @@ def project_view(repo: ProjectRepository, settings: Settings) -> dict:
             "by_state": {k: v.cost for k, v in costs.by_state.items()},
         },
         "documents": [name for name in DOCUMENTS if (repo.dir / name).exists()],
+        # Sections numérotées de scope.md, citées par les raisons de tri (« §2 — … »).
+        "scope_sections": scope_sections(repo.scope_file.read_text(encoding="utf-8")) if repo.scope_file.exists() else {},
     }
 
 
@@ -145,3 +148,23 @@ def project_ids(db: Database) -> list[str]:
 
 def workflow() -> dict:
     return {"states": [str(s) for s in S], "deliverables": {str(s): names for s, names in DELIVERABLES.items()}}
+
+
+CONFIG_FILES = ["research-policy.yaml", "research-values.yaml", "scoring.yaml", "academic-sources.yaml", "costs.yaml"]
+
+
+def config_view(settings: Settings) -> dict:
+    """Paramètres communs à tous les projets (config/*.yaml) : valeurs interprétées et texte commenté des fichiers."""
+    directory = settings.root / "config"
+    return {
+        "policy": settings.policy.model_dump(mode="json"),
+        "values": settings.values.model_dump(mode="json"),
+        "scoring": settings.scoring.model_dump(mode="json"),
+        "sources": settings.sources.model_dump(mode="json"),
+        "costs": settings.costs.model_dump(mode="json"),
+        # Empreintes enregistrées avec chaque recherche (config_hash) et chaque évaluation sur les valeurs.
+        "config_hash": settings.config_hash(),
+        "values_hash": settings.values_hash(),
+        "files": {name: (directory / name).read_text(encoding="utf-8") for name in CONFIG_FILES
+                  if (directory / name).exists()},
+    }

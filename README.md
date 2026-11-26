@@ -7,7 +7,8 @@ Procédures d'exploitation (suivre un projet, décisions humaines, déblocage, s
 
 **Pour s'y retrouver** : `.venv/bin/research-lab serve --open` lance l'interface web sur
 http://127.0.0.1:8765 : tous les projets, diagramme d'état, livrables de chaque état, prochaine étape, qualité,
-coûts. Les données sont lues dans la base à l'ouverture : recharger la page pour actualiser. Lecture seule : les
+coûts ; onglet « Paramètres » pour les réglages communs (`config/`). Les données sont lues dans la base à
+l'ouverture : recharger la page pour actualiser. Lecture seule : les
 décisions humaines restent dans le terminal.
 
 ## Installation

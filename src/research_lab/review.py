@@ -6,6 +6,7 @@ from research_lab.config import Settings
 from research_lab.fulltext import FulltextFetcher, pages_bytes
 from research_lab.schemas.evidence import Evidence, EvidenceLocation, EvidenceType, FulltextRecord, FulltextStatus
 from research_lab.schemas.paper import Paper, PaperStatus, ScreeningDecision
+from research_lab.scope import reason_error, scope_sections
 from research_lab.storage.repositories import (
     ProjectRepository,
     load_fulltext,
@@ -44,7 +45,10 @@ def _project_paper(repo: ProjectRepository, paper_id: str) -> Paper:
 
 
 def decide(repo: ProjectRepository, paper_id: str, decision: PaperStatus, reason: str, actor: str) -> ScreeningDecision:
-    """Inclut ou exclut une publication ; une décision peut être révisée, l'historique est conservé."""
+    """Inclut ou exclut une publication ; une décision peut être révisée, l'historique est conservé.
+
+    La raison cite la section de scope.md qui fonde la décision : « §2 — … ».
+    """
     _require_state(repo, *_EVIDENCE_STATES)
     paper = _project_paper(repo, paper_id)
     if repo.load_project().state == ResearchState.GAP_ANALYSIS and paper.status != PaperStatus.CANDIDATE:
@@ -56,6 +60,9 @@ def decide(repo: ProjectRepository, paper_id: str, decision: PaperStatus, reason
         active = [e.evidence_id for e in repo.load_evidence() if e.paper_id == paper_id and e.active]
         if active:
             raise ReviewError(f"{paper_id} a des preuves actives ({', '.join(active)}) : les retirer avant de l'exclure")
+    scope = repo.scope_file.read_text(encoding="utf-8") if repo.scope_file.exists() else ""
+    if error := reason_error(reason, scope_sections(scope)):
+        raise ReviewError(f"Raison du tri refusée : {error}")
     record = ScreeningDecision(
         project_id=repo.project_id, paper_id=paper_id, decision=decision, reason=reason.strip(), actor=actor, at=now()
     )
