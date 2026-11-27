@@ -11,6 +11,8 @@ import os
 import shutil
 import sqlite3
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -48,7 +50,38 @@ _EVIDENCE_ORDER = "CAST(substr(evidence_id, 4) AS INTEGER)"
 _GAP_ORDER = "CAST(substr(gap_id, 5) AS INTEGER)"
 _QUESTION_ORDER = "CAST(substr(question_id, 4) AS INTEGER)"
 _SOLUTION_ORDER = "CAST(substr(solution_id, 5) AS INTEGER)"
-_OBJECTION_ORDER = "CAST(substr(objection_id, 5) AS INTEGER)"
+
+_ORDER = {state: i for i, state in enumerate(ResearchState)}
+_S = ResearchState
+_IN = "{0} IN (SELECT {0} FROM {1} WHERE project_id = ?)"
+# Données produites à chaque état (enfants avant parents) : un retour en arrière forcé efface celles des états
+# postérieurs à l'état cible. Le corpus (LITERATURE_SEARCH), le tri (LITERATURE_REVIEW) et les recherches
+# contradictoires (GAP_ANALYSIS) demandent un traitement de plus, dans `_erase_after`.
+_STATE_DATA: dict[ResearchState, list[tuple[str, str]]] = {
+    _S.COMPLETED: [("rating_sessions", "project_id = ?")],
+    _S.AWAITING_GATE_2: [("gate_decisions", "project_id = ? AND gate = 'gate_2'"),
+                         ("gate_submissions", "project_id = ? AND gate = 'gate_2'")],
+    _S.SCIENTIFIC_REVIEW: [("objection_responses", _IN.format("objection_id", "objections")),
+                           ("objections", "project_id = ?"), ("scientific_reviews", "project_id = ?")],
+    _S.SOLUTION_DESIGN: [("solution_comparisons", _IN.format("question_id", "research_questions")),
+                         ("solution_evidence", _IN.format("solution_id", "solutions")),
+                         ("solution_versions", _IN.format("solution_id", "solutions")), ("solutions", "project_id = ?")],
+    _S.PROBLEM_FORMULATION: [("question_evidence", _IN.format("question_id", "research_questions")),
+                             ("question_gaps", _IN.format("question_id", "research_questions")),
+                             ("question_versions", _IN.format("question_id", "research_questions")),
+                             ("research_questions", "project_id = ?")],
+    _S.AWAITING_GATE_1: [("gate_decisions", "project_id = ? AND gate = 'gate_1'"),
+                         ("gate_submissions", "project_id = ? AND gate = 'gate_1'")],
+    _S.GAP_ANALYSIS: [("alignments", _IN.format("gap_id", "gaps")), ("gap_evidence", _IN.format("gap_id", "gaps")),
+                      ("gap_versions", _IN.format("gap_id", "gaps"))],
+    _S.LITERATURE_REVIEW: [("page_reads", "project_id = ?"), ("evidence", "project_id = ?"),
+                           ("screening_decisions", "project_id = ?")],
+}
+# Fichiers rédigés à chaque état (les exports JSON sont régénérés depuis la base).
+_STATE_FILES: dict[ResearchState, list[str]] = {
+    _S.SCOPING: ["scope.md"], _S.LITERATURE_REVIEW: ["literature-review.md"], _S.GAP_ANALYSIS: ["drafts"],
+    _S.PROPOSAL_DRAFT: ["research-proposal.md", "references.bib"],
+}
 
 
 class ProjectNotFound(Exception):
@@ -174,50 +207,52 @@ def load_all_papers(db: Database) -> list[Paper]:
     return [_paper_from_row(row, provenance[row["paper_id"]]) for row in rows]
 
 
+# Préfixe -> table et colonne des identifiants globaux qu'il numérote.
+_ID_COLUMNS = {
+    "PAPER": ("papers", "paper_id"), "SEARCH": ("searches", "search_id"), "EV": ("evidence", "evidence_id"),
+    "GAP": ("gaps", "gap_id"), "RQ": ("research_questions", "question_id"), "SOL": ("solutions", "solution_id"),
+    "OBJ": ("objections", "objection_id"), "EVAL": ("rating_sessions", "session_id"),
+}
+
+
+def highest_id(db: Database, prefix: str) -> int:
+    """Plus grand numéro jamais attribué à ce préfixe, y compris par un projet supprimé (`id_counters`)."""
+    table, column = _ID_COLUMNS[prefix]
+    in_use = db.conn.execute(f"SELECT MAX(CAST(substr({column}, {len(prefix) + 2}) AS INTEGER)) FROM {table}").fetchone()[0]
+    counter = db.conn.execute("SELECT last FROM id_counters WHERE prefix = ?", (prefix,)).fetchone()
+    return max(in_use or 0, counter["last"] if counter else 0)
+
+
+def _next_id(db: Database, prefix: str) -> str:
+    return f"{prefix}-{highest_id(db, prefix) + 1:03d}"
+
+
 def next_search_id(db: Database) -> str:
-    row = db.conn.execute(f"SELECT search_id FROM searches ORDER BY {_SEARCH_ORDER} DESC LIMIT 1").fetchone()
-    highest = int(row["search_id"].split("-")[1]) if row else 0
-    return f"SEARCH-{highest + 1:03d}"
+    return _next_id(db, "SEARCH")
 
 
 def next_evidence_id(db: Database) -> str:
-    row = db.conn.execute(f"SELECT evidence_id FROM evidence ORDER BY {_EVIDENCE_ORDER} DESC LIMIT 1").fetchone()
-    highest = int(row["evidence_id"].split("-")[1]) if row else 0
-    return f"EV-{highest + 1:03d}"
+    return _next_id(db, "EV")
 
 
 def next_gap_id(db: Database) -> str:
-    row = db.conn.execute(f"SELECT gap_id FROM gaps ORDER BY {_GAP_ORDER} DESC LIMIT 1").fetchone()
-    highest = int(row["gap_id"].split("-")[1]) if row else 0
-    return f"GAP-{highest + 1:03d}"
+    return _next_id(db, "GAP")
 
 
 def next_question_id(db: Database) -> str:
-    row = db.conn.execute(
-        f"SELECT question_id FROM research_questions ORDER BY {_QUESTION_ORDER} DESC LIMIT 1"
-    ).fetchone()
-    highest = int(row["question_id"].split("-")[1]) if row else 0
-    return f"RQ-{highest + 1:03d}"
+    return _next_id(db, "RQ")
 
 
 def next_solution_id(db: Database) -> str:
-    row = db.conn.execute(f"SELECT solution_id FROM solutions ORDER BY {_SOLUTION_ORDER} DESC LIMIT 1").fetchone()
-    highest = int(row["solution_id"].split("-")[1]) if row else 0
-    return f"SOL-{highest + 1:03d}"
+    return _next_id(db, "SOL")
 
 
 def next_objection_id(db: Database) -> str:
-    row = db.conn.execute(f"SELECT objection_id FROM objections ORDER BY {_OBJECTION_ORDER} DESC LIMIT 1").fetchone()
-    highest = int(row["objection_id"].split("-")[1]) if row else 0
-    return f"OBJ-{highest + 1:03d}"
+    return _next_id(db, "OBJ")
 
 
 def next_rating_session_id(db: Database) -> str:
-    row = db.conn.execute(
-        "SELECT session_id FROM rating_sessions ORDER BY CAST(substr(session_id, 6) AS INTEGER) DESC LIMIT 1"
-    ).fetchone()
-    highest = int(row["session_id"].split("-")[1]) if row else 0
-    return f"EVAL-{highest + 1:03d}"
+    return _next_id(db, "EVAL")
 
 
 def load_all_rating_sessions(db: Database) -> list[RatingSession]:
@@ -334,6 +369,122 @@ class ProjectRepository:
         self.export()
         return project
 
+    def delete(self) -> dict[str, int]:
+        """Supprime définitivement le projet : ses données dans la base et son dossier.
+
+        Les publications et textes intégraux partagés avec un autre projet sont conservés ; les autres sont
+        supprimés avec leurs fichiers. Les compteurs d'identifiants sont relevés d'abord : aucun identifiant
+        ne sera réattribué. Rien d'autre ne reste du projet.
+        """
+        paper_ids = self.paper_ids()
+        with self._erasing() as conn:
+            counts = self._erase_after(conn, None)
+            for table in ("state_changes", "projects"):
+                conn.execute(f"DELETE FROM {table} WHERE project_id = ?", (self.project_id,))
+            orphans = self._drop_orphan_papers(conn, paper_ids)
+        self._remove_paper_files(orphans)
+        shutil.rmtree(self.dir, ignore_errors=True)
+        return {**counts, "papers": len(orphans), "papers_kept": len(paper_ids) - len(orphans)}
+
+    def _rewind(self, target: ResearchState, actor: str) -> Project:
+        """Retour en arrière forcé : efface tout ce qu'ont produit les états postérieurs à `target`.
+
+        Données dans la base, fichiers rédigés et passages par ces états dans l'historique : le projet est
+        remis dans l'état où il aurait été s'il ne les avait jamais atteints. Les retours prévus par le
+        workflow (révision demandée à une gate, revue défavorable) ne passent pas par ici et ne suppriment rien.
+        """
+        later = [s for s in ResearchState if _ORDER[s] > _ORDER[target]]
+        paper_ids = self.paper_ids()
+        with self._erasing() as conn:
+            self._erase_after(conn, target)
+            conn.execute(
+                f"DELETE FROM state_changes WHERE project_id = ? AND (to_state IN ({','.join('?' * len(later))}) "
+                f"OR from_state IN ({','.join('?' * len(later))}))",
+                (self.project_id, *later, *later),
+            )
+            last = conn.execute(
+                "SELECT to_state FROM state_changes WHERE project_id = ? ORDER BY rowid DESC LIMIT 1", (self.project_id,)
+            ).fetchone()
+            at = now()
+            conn.execute("UPDATE projects SET state = ?, updated_at = ? WHERE project_id = ?",
+                         (target, at.isoformat(), self.project_id))
+            if last is None or last["to_state"] != target:  # état cible jamais atteint (transitions forcées en avant)
+                change = StateChange(from_state=last["to_state"] if last else None, to_state=target, at=at,
+                                     actor=actor, forced=True)
+                _insert_state_change(conn, self.project_id, change)
+            orphans = self._drop_orphan_papers(conn, paper_ids)
+        self._remove_paper_files(orphans)
+        for state in later:
+            for name in _STATE_FILES.get(state, []):
+                path = self.dir / name
+                shutil.rmtree(path, ignore_errors=True) if path.is_dir() else path.unlink(missing_ok=True)
+        self.export()
+        return self.load_project()
+
+    @contextmanager
+    def _erasing(self) -> Iterator[sqlite3.Connection]:
+        """Transaction de suppression : compteurs d'identifiants relevés, protections levées le temps de la transaction."""
+        with self.db.transaction() as conn:
+            for prefix in _ID_COLUMNS:
+                conn.execute(
+                    "INSERT INTO id_counters (prefix, last) VALUES (?, ?) "
+                    "ON CONFLICT (prefix) DO UPDATE SET last = MAX(last, excluded.last)",
+                    (prefix, highest_id(self.db, prefix)),
+                )
+            conn.execute("INSERT INTO project_deletions (project_id) VALUES (?)", (self.project_id,))
+            yield conn
+            conn.execute("DELETE FROM project_deletions WHERE project_id = ?", (self.project_id,))
+
+    def _erase_after(self, conn: sqlite3.Connection, target: ResearchState | None) -> dict[str, int]:
+        """Supprime les données des états postérieurs à `target` (de tous les états si None), du dernier au premier."""
+        pid = (self.project_id,)
+        counts: dict[str, int] = {}
+
+        def delete(table: str, where: str, params: tuple = pid) -> None:
+            counts[table] = counts.get(table, 0) + conn.execute(f"DELETE FROM {table} WHERE {where}", params).rowcount
+
+        for state in reversed(ResearchState):
+            if target is not None and _ORDER[state] <= _ORDER[target]:
+                break
+            for table, where in _STATE_DATA.get(state, []):
+                delete(table, where)
+            if state == ResearchState.GAP_ANALYSIS:
+                # Recherches contradictoires : les publications qu'elles seules ont apportées quittent le corpus.
+                brought = [r["paper_id"] for r in conn.execute(
+                    "SELECT paper_id FROM project_papers pp WHERE project_id = ? AND NOT EXISTS ("
+                    " SELECT 1 FROM provenance pr JOIN searches s USING (search_id)"
+                    " WHERE pr.paper_id = pp.paper_id AND s.project_id = pp.project_id AND s.gap_id IS NULL)", pid)]
+                for paper_id in brought:
+                    for table in ("page_reads", "evidence", "screening_decisions", "project_papers"):
+                        delete(table, "project_id = ? AND paper_id = ?", (self.project_id, paper_id))
+                delete("provenance", "search_id IN (SELECT search_id FROM searches WHERE project_id = ? AND gap_id IS NOT NULL)")
+                delete("searches", "project_id = ? AND gap_id IS NOT NULL")
+                delete("gaps", "project_id = ?")
+            elif state == ResearchState.LITERATURE_REVIEW:
+                conn.execute("UPDATE project_papers SET status = ? WHERE project_id = ?", (PaperStatus.CANDIDATE, self.project_id))
+            elif state == ResearchState.LITERATURE_SEARCH:
+                delete("provenance", "search_id IN (SELECT search_id FROM searches WHERE project_id = ?)")
+                delete("searches", "project_id = ?")
+                delete("project_papers", "project_id = ?")
+        return counts
+
+    def _drop_orphan_papers(self, conn: sqlite3.Connection, paper_ids: set[str]) -> list[str]:
+        """Supprime celles de ces publications qu'aucun projet n'utilise plus (sans provenance, elles seraient invalides)."""
+        orphans = [p for p in sorted(paper_ids)
+                   if not conn.execute("SELECT 1 FROM project_papers WHERE paper_id = ?", (p,)).fetchone()]
+        if stripped := [p for p in paper_ids if p not in orphans
+                        and not conn.execute("SELECT 1 FROM provenance WHERE paper_id = ?", (p,)).fetchone()]:
+            raise RuntimeError(f"Publications d'autres projets sans autre provenance : {', '.join(sorted(stripped))}")
+        for p in orphans:
+            for table in ("provenance", "fulltexts", "papers"):
+                conn.execute(f"DELETE FROM {table} WHERE paper_id = ?", (p,))
+        return orphans
+
+    def _remove_paper_files(self, paper_ids: list[str]) -> None:
+        for p in paper_ids:
+            pdf_path(self.papers_dir, p).unlink(missing_ok=True)
+            pages_path(self.papers_dir, p).unlink(missing_ok=True)
+
     def load_project(self) -> Project:
         row = self.db.conn.execute("SELECT * FROM projects WHERE project_id = ?", (self.project_id,)).fetchone()
         if row is None:
@@ -390,6 +541,8 @@ class ProjectRepository:
         project = self.load_project()
         if force:
             check_forced_transition(project.state, target)
+            if _ORDER[target] < _ORDER[project.state]:
+                return self._rewind(target, actor)
         else:
             check_transition(project.state, target, self.facts(policy))
         change = StateChange(from_state=project.state, to_state=target, at=now(), actor=actor, forced=force)

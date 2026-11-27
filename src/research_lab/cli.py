@@ -3,8 +3,6 @@
 import dataclasses
 import getpass
 import json
-import shutil
-import sqlite3
 import sys
 import webbrowser
 from datetime import date
@@ -14,6 +12,7 @@ from typing import Annotated
 import typer
 from pydantic import BaseModel, ValidationError
 
+from research_lab.backup import backup_lab
 from research_lab.config import Settings, load_settings
 from research_lab.corpus import CorpusStatus, check_corpus
 from research_lab.costs import Line, cost_report, load_usage, sync
@@ -231,6 +230,21 @@ def project_resume(
         typer.echo(f"Exports périmés : {', '.join(report.stale_exports)} (`project resume {project_id} --repair`)")
 
 
+@project_app.command("delete")
+def project_delete(project_id: ProjectId) -> None:
+    """Supprime définitivement un projet (base et dossier) ; humain seulement, après confirmation."""
+    _, repo = _context(project_id)
+    _require_project(repo)
+    if reason := human_check_failure():
+        _fail(f"Suppression refusée : {reason}")
+    typer.echo(f"Suppression définitive de {project_id} : données dans la base et dossier {repo.dir}.\n"
+               "Les publications utilisées par un autre projet sont conservées ; les identifiants ne sont pas réattribués.")
+    if typer.prompt("Retaper l'identifiant du projet pour confirmer") != project_id:
+        _fail("Identifiant différent : rien n'a été supprimé")
+    counts = repo.delete()
+    typer.echo(f"{project_id} supprimé ({counts['papers']} publications supprimées, {counts['papers_kept']} conservées)")
+
+
 @project_app.command("transition")
 def project_transition(
     project_id: ProjectId,
@@ -242,6 +256,17 @@ def project_transition(
     """Fait passer le projet à l'état suivant si les préconditions sont remplies."""
     settings, repo = _context(project_id)
     _require_project(repo)
+    current = repo.load_project().state
+    states = list(ResearchState)
+    if force and states.index(target) < states.index(current):
+        # Retour en arrière forcé : efface ce qu'ont produit les états suivants. Humain seulement, comme `project delete`.
+        if reason := human_check_failure():
+            _fail(f"Retour en arrière refusé : {reason}")
+        typer.echo(f"Retour de {current} à {target} : tout ce qu'ont produit les états "
+                   f"{', '.join(s for s in states[states.index(target) + 1:states.index(current) + 1])} "
+                   "sera supprimé définitivement (base, fichiers rédigés, historique).")
+        if typer.prompt("Retaper l'identifiant du projet pour confirmer") != project_id:
+            _fail("Identifiant différent : rien n'a changé")
     try:
         project = repo.transition(target, actor=getpass.getuser(), policy=settings.policy, force=force)
     except TransitionError as exc:
@@ -1397,7 +1422,7 @@ def serve(
     port: Annotated[int, typer.Option(help="Port d'écoute (127.0.0.1 seulement)")] = 8765,
     open_page: Annotated[bool, typer.Option("--open", help="Ouvrir l'interface dans le navigateur")] = False,
 ) -> None:
-    """Interface web : projets, diagramme d'état, livrables de chaque état, qualité et coûts (lecture seule)."""
+    """Interface web : projets, diagramme d'état, livrables, qualité, coûts ; opérations déterministes (pas les gates)."""
     import uvicorn
 
     from research_lab.api import create_app
@@ -1448,15 +1473,10 @@ def db_backup(
 ) -> None:
     """Sauvegarde cohérente du laboratoire : base, textes intégraux, dossiers des projets (non versionnés)."""
     settings, db = _settings_and_db()
-    if target.exists() and any(target.iterdir()):
-        _fail(f"{target} n'est pas vide")
-    (target / "knowledge").mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(target / "knowledge" / "research.db") as copy:
-        db.conn.backup(copy)  # cohérent même si une autre commande écrit en même temps
-    for source, name in ((settings.papers_dir, "knowledge/papers"), (settings.projects_dir, "research/projects")):
-        if source.exists():
-            shutil.copytree(source, target / name, ignore=shutil.ignore_patterns("*.tmp"))
-    version = db.conn.execute("PRAGMA user_version").fetchone()[0]
+    try:
+        version = backup_lab(settings, db, target)
+    except FileExistsError as exc:
+        _fail(str(exc))
     typer.echo(f"Sauvegarde dans {target} (schéma v{version}) : knowledge/research.db, knowledge/papers, research/projects")
 
 

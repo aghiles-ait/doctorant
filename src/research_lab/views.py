@@ -6,6 +6,7 @@ from collections import Counter
 from pathlib import Path
 
 from research_lab.config import Settings
+from research_lab.config_edit import CONFIG_FILES, INFORMATIVE, config_data
 from research_lab.costs import cost_report, load_usage
 from research_lab.evaluation import quality_report
 from research_lab.proposal import PROPOSAL_FILE, check_proposal_file
@@ -150,8 +151,6 @@ def workflow() -> dict:
     return {"states": [str(s) for s in S], "deliverables": {str(s): names for s, names in DELIVERABLES.items()}}
 
 
-CONFIG_FILES = ["research-policy.yaml", "research-values.yaml", "scoring.yaml", "academic-sources.yaml", "costs.yaml"]
-
 
 def config_view(settings: Settings) -> dict:
     """Paramètres communs à tous les projets (config/*.yaml) : valeurs interprétées et texte commenté des fichiers."""
@@ -167,4 +166,6 @@ def config_view(settings: Settings) -> dict:
         "values_hash": settings.values_hash(),
         "files": {name: (directory / name).read_text(encoding="utf-8") for name in CONFIG_FILES
                   if (directory / name).exists()},
+        "data": config_data(settings.root),  # contenu des fichiers, pour les formulaires
+        "informative": INFORMATIVE,  # sections non lues par le code : en lecture seule
     }

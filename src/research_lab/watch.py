@@ -5,7 +5,7 @@ from research_lab.config import Settings
 from research_lab.corpus import merge_hits
 from research_lab.providers.base import Provider, ProviderError
 from research_lab.schemas.search import SearchExecution, SearchQuery, SearchStatus, SourceResult, SourceStatus
-from research_lab.storage.repositories import ProjectRepository, load_all_papers, next_search_id, now
+from research_lab.storage.repositories import ProjectRepository, highest_id, load_all_papers, next_search_id, now
 from research_lab.workflow.state import ResearchState
 
 
@@ -83,7 +83,7 @@ def run_search(
     touched = []
     if status != SearchStatus.FAILED:
         papers = load_all_papers(repo.db)
-        report = merge_hits(papers, all_hits, search_id, query.text, started_at)
+        report = merge_hits(papers, all_hits, search_id, query.text, started_at, highest_id(repo.db, "PAPER"))
         in_project = repo.paper_ids()
         new_ids = [pid for pid in report.touched_paper_ids if pid not in in_project]
         matched_ids = [pid for pid in report.touched_paper_ids if pid in in_project]

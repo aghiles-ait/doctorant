@@ -26,9 +26,9 @@ class MergeReport:
         return [*self.new_paper_ids, *self.matched_paper_ids]
 
 
-def _next_id(papers: list[Paper]) -> str:
-    highest = max((int(p.paper_id.split("-")[1]) for p in papers), default=0)
-    return f"PAPER-{highest + 1:03d}"
+def _next_id(papers: list[Paper], floor: int) -> str:
+    highest = max((int(p.paper_id.split("-")[1]) for p in papers), default=floor)
+    return f"PAPER-{max(highest, floor) + 1:03d}"
 
 
 def _fill_missing(paper: Paper, metadata: PaperMetadata, papers: list[Paper]) -> list[str]:
@@ -60,11 +60,13 @@ def merge_hits(
     search_id: str,
     query: str,
     retrieved_at: datetime,
+    id_floor: int = 0,
 ) -> MergeReport:
     """Fusionne les résultats dans `papers` (modifiée en place).
 
     Un résultat qui correspond à une publication connue lui ajoute une provenance ;
-    sinon il crée une publication avec un nouvel identifiant PAPER-xxx. Les identifiants
+    sinon il crée une publication avec un nouvel identifiant PAPER-xxx, au-delà de `id_floor`
+    (numéros déjà attribués à des publications supprimées avec leur projet). Les identifiants
     existants ne changent jamais.
     """
     report = MergeReport()
@@ -78,7 +80,7 @@ def merge_hits(
         )
         existing = find_duplicate(hit.metadata, papers)
         if existing is None:
-            paper = Paper(paper_id=_next_id(papers), provenance=[provenance], **hit.metadata.model_dump())
+            paper = Paper(paper_id=_next_id(papers, id_floor), provenance=[provenance], **hit.metadata.model_dump())
             papers.append(paper)
             report.new_paper_ids.append(paper.paper_id)
             continue

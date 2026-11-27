@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
+import { DeleteProjectDialog, SyncCostsButton } from "./components/actions";
 import { ConfigPage } from "./components/ConfigPage";
 import { DocumentDialog } from "./components/DocumentDialog";
 import { NextStep } from "./components/NextStep";
@@ -27,6 +28,7 @@ export function App() {
   const [document, setDocument] = useState<{ name: string; text: string | null }>();
   const [updatedAt, setUpdatedAt] = useState<Date>();
   const [error, setError] = useState<string>();
+  const [deleting, setDeleting] = useState(false);
 
   const projectId = selected.id ?? projects[0]?.id;
   const state = selected.state ?? project?.state;
@@ -37,7 +39,7 @@ export function App() {
       const [wf, list] = await Promise.all([workflow ? Promise.resolve(workflow) : api.workflow(), api.projects()]);
       setWorkflow(wf);
       setProjects(list);
-      const id = projectId ?? list[0]?.id;
+      const id = list.some((p) => p.id === projectId) ? projectId : list[0]?.id;
       setProject(id ? await api.project(id) : undefined);
       setUpdatedAt(new Date());
       setError(undefined);
@@ -69,7 +71,7 @@ export function App() {
         </nav>
         <span className="gen">
           {error ? <span className="err">Serveur injoignable : {error}</span>
-            : updatedAt && `données du ${updatedAt.toLocaleTimeString("fr-FR")} · recharger la page pour actualiser`}
+            : updatedAt && `données du ${updatedAt.toLocaleTimeString("fr-FR")} · recharger la page pour voir le travail de l'agent`}
         </span>
       </header>
       <div className="layout">
@@ -84,9 +86,10 @@ export function App() {
               <div className="phead">
                 <h2>{project.topic}</h2>
                 <div className="meta"><code>{project.id}</code> · {STATES[project.state].label} depuis le{" "}
-                  {fmtDate(project.history.at(-1)?.at)} · créé le {fmtDate(project.created_at)}</div>
+                  {fmtDate(project.history.at(-1)?.at)} · créé le {fmtDate(project.created_at)}
+                  <button className="act small danger" onClick={() => setDeleting(true)}>Supprimer</button></div>
               </div>
-              <NextStep project={project} />
+              <NextStep project={project} onChanged={load} />
               <div className="card diagram">
                 <h3>Diagramme d'état <span className="sub">— cliquer sur un état pour voir ses livrables</span></h3>
                 <StateDiagram project={project} states={workflow.states} selected={state}
@@ -97,18 +100,21 @@ export function App() {
                   <span>N× : nombre de passages · pointillés : retours en arrière</span>
                 </div>
               </div>
-              <StateDetail project={project} workflow={workflow} state={state} onOpenDocument={openDocument} />
+              <StateDetail project={project} workflow={workflow} state={state} onOpenDocument={openDocument}
+                onChanged={load} />
               <div className="grid2">
                 <div className="card"><h3>Historique</h3><HistoryTable project={project} /></div>
                 <div>
                   <div className="card"><h3>Qualité (indicateurs calculés)</h3><QualityTable project={project} /></div>
-                  <div className="card"><h3>Coûts</h3><CostsPanel project={project} /></div>
+                  <div className="card"><h3>Coûts <SyncCostsButton onChanged={load} /></h3><CostsPanel project={project} /></div>
                 </div>
               </div>
             </>
           )}
         </main>
       </div>
+      {deleting && project && <DeleteProjectDialog project={project} onClose={() => setDeleting(false)}
+        onDeleted={() => { setProject(undefined); setSelected({}); load(); }} />}
       {document && project && <DocumentDialog title={`${project.id} / ${document.name}`} text={document.text}
         onClose={() => setDocument(undefined)} />}
     </>

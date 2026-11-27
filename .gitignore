@@ -10,3 +10,4 @@ knowledge/research.db-*
 knowledge/papers/
 *.tmp
 research
+backups/

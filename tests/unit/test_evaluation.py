@@ -43,7 +43,7 @@ def test_report_measures_q1_to_q5_and_review(reviewing, settings):
 
 
 def test_untested_hypothesis_and_forced_transition_are_flagged(design, settings):
-    design.transition(S.PROBLEM_FORMULATION, actor="agent", policy=settings.policy, force=True)
+    design.transition(S.SCIENTIFIC_REVIEW, actor="agent", policy=settings.policy, force=True)
     indicators = _indicators(quality_report(design, settings))
     assert indicators["hypothèses testées par au moins une solution"] == ("0/2 (0 %)", False)
     assert indicators["transitions forcées"] == ("1", False)

@@ -354,7 +354,9 @@ de tes données de recherche.
   la dernière décision de gate, blocages de chaque étape suivante) et signale les exports périmés
   (`--repair` les régénère). Tests de reprise : nouvelle session, interruption avant l'export, au milieu
   d'une transaction ou d'une décision de gate.
-- `project transition --force` : n'importe quel état sans précondition, hors gates, tracé dans l'historique.
+- `project transition --force` : n'importe quel état sans précondition, hors gates. En avant, tracé dans l'historique ;
+  en arrière (humain seulement, identifiant à retaper), efface tout ce qu'ont produit les états suivants.
+- `project delete` : suppression définitive d'un projet (humain seulement, identifiant à retaper).
 - Évaluation de la qualité scientifique (`eval`) : `eval report <id>` calcule des indicateurs Q1 à Q5, revue
   et workflow (identifiants, provenance, citations, lecture, recherches contradictoires, hypothèses testées,
   limites, verdict, transitions forcées) ; ils mesurent ce qui est vérifiable, pas la valeur scientifique.

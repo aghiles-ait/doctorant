@@ -21,6 +21,8 @@ const LOOPS: [State, State, string, "top" | "bottom", number][] = [
 interface Props { project: ProjectView; states: State[]; selected: State; onSelect: (s: State) => void }
 
 export function StateDiagram({ project, states, selected, onSelect }: Props) {
+  // Vert : les états qui précèdent l'état actuel ; un retour en arrière forcé efface ce qui suivait.
+  const rank = states.indexOf(project.state);
   const used: Record<string, number> = {};
   for (const c of project.history) if (c.from_state) used[`${c.from_state}>${c.to_state}`] = (used[`${c.from_state}>${c.to_state}`] ?? 0) + 1;
 
@@ -31,7 +33,7 @@ export function StateDiagram({ project, states, selected, onSelect }: Props) {
       : cb > ca
         ? `M${X(ca) + W / 2},${Y(ra)} L${X(cb) - W / 2 - 6},${Y(rb)}`
         : `M${X(ca) - W / 2},${Y(ra)} L${X(cb) + W / 2 + 6},${Y(rb)}`;
-    const n = used[`${a}>${b}`];
+    const n = states.indexOf(b) <= rank;
     return <path key={a} className={`edge ${n ? "used" : ""}`} d={d} markerEnd={`url(#${n ? "au" : "a"})`} />;
   });
 
@@ -52,7 +54,7 @@ export function StateDiagram({ project, states, selected, onSelect }: Props) {
 
   const nodes = states.map((s) => {
     const [c, r] = POS[s], visits = project.visits[s] ?? 0, gate = GATES.has(s);
-    const cls = ["node", gate && "gate", visits && "visited", s === project.state && "current", s === selected && "sel"]
+    const cls = ["node", gate && "gate", states.indexOf(s) < rank && "visited", s === project.state && "current", s === selected && "sel"]
       .filter(Boolean).join(" ");
     const onKey = (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(s); } };
     return (

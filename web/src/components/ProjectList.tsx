@@ -1,13 +1,17 @@
+import { useState } from "react";
 import type { ProjectSummary, State } from "../types";
 import { STATES } from "../workflow";
+import { NewProjectDialog } from "./actions";
 import { Badge } from "./ui";
 
 interface Props { projects: ProjectSummary[]; states: State[]; selected?: string; onSelect: (id: string) => void }
 
 export function ProjectList({ projects, states, selected, onSelect }: Props) {
-  if (!projects.length) return <p className="empty">Aucun projet dans la base.</p>;
+  const [creating, setCreating] = useState(false);
   return (
     <>
+      <button className="act wide" onClick={() => setCreating(true)}>+ Nouveau projet</button>
+      {!projects.length && <p className="empty">Aucun projet dans la base.</p>}
       {projects.map((p) => (
         <button key={p.id} className={`pcard ${p.id === selected ? "sel" : ""}`} onClick={() => onSelect(p.id)}>
           <div className="t">{p.topic}</div>
@@ -17,6 +21,7 @@ export function ProjectList({ projects, states, selected, onSelect }: Props) {
           {p.waiting_for_human && <Badge tone="gate">à toi de décider</Badge>}
         </button>
       ))}
+      {creating && <NewProjectDialog onCreated={onSelect} onClose={() => setCreating(false)} />}
     </>
   );
 }

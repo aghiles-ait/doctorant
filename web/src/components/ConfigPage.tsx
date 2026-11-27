@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
 import type { Config } from "../types";
+import { BackupButton } from "./actions";
+import { ConfigEditor } from "./ConfigEditor";
 import { DocumentDialog } from "./DocumentDialog";
 import { Badge, Empty } from "./ui";
 
@@ -25,10 +27,13 @@ const POLICY: [string, [keyof Config["policy"], string][]][] = [
 
 const show = (v: unknown) => (typeof v === "boolean" ? (v ? "oui" : "non") : Array.isArray(v) ? v.join(", ") : String(v));
 
-function Section({ title, file, children, onOpen }: { title: string; file: string; children: ReactNode; onOpen: (f: string) => void }) {
+function Section({ title, file, children, onOpen, onEdit }: {
+  title: string; file: string; children: ReactNode; onOpen: (f: string) => void; onEdit: (f: string) => void;
+}) {
   return (
     <div className="card">
-      <h3>{title} <button className="file small" onClick={() => onOpen(file)}>config/{file}</button></h3>
+      <h3>{title} <button className="file small" onClick={() => onOpen(file)}>config/{file}</button>
+        <button className="act small" onClick={() => onEdit(file)}>Modifier</button></h3>
       {children}
     </div>
   );
@@ -46,7 +51,10 @@ export function ConfigPage() {
   const [config, setConfig] = useState<Config>();
   const [error, setError] = useState<string>();
   const [file, setFile] = useState<string>();
-  useEffect(() => { api.config().then(setConfig, (e) => setError(String(e))); }, []);
+  const [editing, setEditing] = useState<string>();
+  const [saved, setSaved] = useState<string>();
+  const load = () => api.config().then(setConfig, (e) => setError(String(e)));
+  useEffect(() => { load(); }, []);
 
   if (error) return <Empty>{error}</Empty>;
   if (!config) return <Empty>Chargement…</Empty>;
@@ -57,9 +65,10 @@ export function ConfigPage() {
     <>
       <div className="phead">
         <h2>Paramètres</h2>
-        <div className="meta">Communs à tous les projets, lus dans <code>config/</code>. Lecture seule : modifier les fichiers
-          YAML, puis recharger la page.</div>
+        <div className="meta">Communs à tous les projets, lus dans <code>config/</code>. « Modifier » ouvre un formulaire
+          pré-rempli ; le fichier est validé avant d'être écrit, commentaires conservés.</div>
       </div>
+      {saved && <div className="next"><b>✓ Enregistré</b>{saved}</div>}
       <div className="next">
         <b>Traçabilité</b>
         Chaque recherche enregistre l'empreinte de la configuration (sources et politique) en vigueur, et chaque évaluation
@@ -69,7 +78,7 @@ export function ConfigPage() {
           <code>{config.values_hash.slice(7, 19)}</code></p>
       </div>
 
-      <Section title="Politique de recherche" file="research-policy.yaml" onOpen={setFile}>
+      <Section title="Politique de recherche" file="research-policy.yaml" onOpen={setFile} onEdit={setEditing}>
         <p className="sub">Seuils appliqués par le code aux transitions du workflow et aux contrôles.</p>
         {POLICY.map(([step, keys]) => (
           <div key={step} className="item">
@@ -80,7 +89,7 @@ export function ConfigPage() {
       </Section>
 
       <div className="grid2">
-        <Section title="Valeurs du laboratoire" file="research-values.yaml" onOpen={setFile}>
+        <Section title="Valeurs du laboratoire" file="research-values.yaml" onOpen={setFile} onEdit={setEditing}>
           <p className="sub">Servent à évaluer et prioriser les gaps, jamais à en créer. Échelle {values.evaluation.scale[0]} à{" "}
             {values.evaluation.scale.at(-1)}{values.evaluation.allow_not_applicable && ", « non applicable » permis"}.</p>
           {Object.entries(values.values).map(([name, v]) => (
@@ -93,12 +102,12 @@ export function ConfigPage() {
         </Section>
 
         <div>
-          <Section title="Priorité des gaps" file="scoring.yaml" onOpen={setFile}>
+          <Section title="Priorité des gaps" file="scoring.yaml" onOpen={setFile} onEdit={setEditing}>
             <p className="sub">priorité = {Object.entries(scoring.priority.weights).map(([k, w]) => `${w} × ${k}`).join(" + ")}</p>
             <Rows rows={Object.entries(scoring.priority.evidence_strength).map(([k, v]) => [`force des preuves « ${k} »`, v])} />
           </Section>
 
-          <Section title="Évaluation humaine" file="research-policy.yaml" onOpen={setFile}>
+          <Section title="Évaluation humaine" file="research-policy.yaml" onOpen={setFile} onEdit={setEditing}>
             <p className="sub">Notes de {policy.evaluation.scale[0]} à {policy.evaluation.scale.at(-1)} (`eval rate`) ; objectif du
               MVP : {policy.evaluation.min_rated_topics} sujets évalués.</p>
             <div className="item"><div className="h"><b>Gaps</b></div>
@@ -109,7 +118,7 @@ export function ConfigPage() {
         </div>
       </div>
 
-      <Section title="Sources académiques" file="academic-sources.yaml" onOpen={setFile}>
+      <Section title="Sources académiques" file="academic-sources.yaml" onOpen={setFile} onEdit={setEditing}>
         <p className="sub">Par défaut : {sources.default_sources.join(", ")}, {sources.default_max_results} résultats par source.
           Relances : {sources.retry.max_attempts} tentatives, attentes de {sources.retry.delays_seconds.join(", ")} s
           (Retry-After respecté jusqu'à {sources.retry.max_retry_after_seconds} s).</p>
@@ -134,7 +143,7 @@ export function ConfigPage() {
           appel de `fulltext show`.</p>
       </Section>
 
-      <Section title="Coûts" file="costs.yaml" onOpen={setFile}>
+      <Section title="Coûts" file="costs.yaml" onOpen={setFile} onEdit={setEditing}>
         <p className="sub">Prix en dollars par million de jetons (équivalent API). Agents rattachés à un projet :{" "}
           {costs.research_agents.join(", ")}.</p>
         <div className="tablewrap"><table>
@@ -148,6 +157,14 @@ export function ConfigPage() {
         </table></div>
       </Section>
 
+      <div className="card">
+        <h3>Sauvegarde</h3>
+        <BackupButton />
+      </div>
+
+      {editing && <ConfigEditor key={editing} file={editing} data={config.data[editing]}
+        informative={config.informative[editing] ?? {}}
+        onSaved={(message) => { setSaved(message); load(); }} onClose={() => setEditing(undefined)} />}
       {file && <DocumentDialog title={`config/${file}`} text={config.files[file] ?? ""} raw onClose={() => setFile(undefined)} />}
     </>
   );

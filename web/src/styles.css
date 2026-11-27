@@ -120,6 +120,35 @@ td { overflow-wrap: normal; }
   border-radius: 6px; background: var(--bg); color: var(--ink); }
 .filters input { flex: 1; min-width: 180px; }
 
+button.act, label.act { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--accent);
+  background: var(--accent); color: #fff; cursor: pointer; }
+button.act:hover:not(:disabled) { filter: brightness(1.1); }
+button.act:disabled { opacity: .45; cursor: default; }
+button.act.small { font-size: 11px; padding: 1px 8px; margin-left: 8px; font-weight: normal; vertical-align: 1px; }
+button.act.danger { background: var(--bad); border-color: var(--bad); }
+button.act.wide { width: 100%; margin-bottom: 10px; }
+.actions { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.actions > details, .actions > p, .actions > .err-msg { flex-basis: 100%; margin: 0; }
+.err-msg { color: var(--bad); font-size: 13px; margin: 4px 0; }
+.form { display: flex; flex-direction: column; gap: 10px; }
+.form label { display: flex; flex-direction: column; gap: 3px; font-size: 13px; font-weight: 600; }
+.form label.check { flex-direction: row; align-items: center; gap: 6px; font-weight: normal; }
+.form input, .form textarea, .form select, .actions select { font: inherit; font-size: 13px; padding: 5px 8px;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font-weight: normal; }
+.form > button.act { align-self: flex-start; }
+.form .row, .actions .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.form .row label:not(.check) { flex: 1; min-width: 140px; }
+.form.panel { background: var(--bg); border-radius: 10px; padding: 12px 14px; margin: 8px 0 14px; }
+dialog form.form { padding: 14px 18px 18px; }
+.config-form fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px 12px; margin: 0;
+  display: flex; flex-direction: column; gap: 8px; }
+.config-form fieldset.readonly { background: var(--soft); }
+.config-form fieldset.readonly pre { margin: 0; }
+.config-form legend { font-weight: 600; font-size: 13px; padding: 0 4px; }
+.config-form > button.act { position: sticky; bottom: 0; }
+dialog.small { width: min(520px, 94vw); }
+.outcome { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+
 dialog { width: min(900px, 94vw); max-height: 88vh; border: 1px solid var(--line); border-radius: 12px; padding: 0;
   background: var(--panel); color: var(--ink); }
 dialog::backdrop { background: rgba(0, 0, 0, .4); }

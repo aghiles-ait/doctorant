@@ -1,0 +1,147 @@
+[
+  {
+    "title": "Trustworthy Decentralized Autonomous Machines: A New Paradigm in Automation Economy",
+    "authors": [
+      "Fernando Castillo",
+      "Oscar Castillo",
+      "Eduardo Brito",
+      "Simon Espinola"
+    ],
+    "abstract": "Decentralized Autonomous Machines (DAMs) represent a transformative paradigm in automation economy, integrating artificial intelligence (AI), blockchain technology, and Internet of Things (IoT) devices to create self-governing economic agents participating in Decentralized Physical Infrastructure Networks (DePIN). Capable of managing both digital and physical assets and unlike traditional Decentralized Autonomous Organizations (DAOs), DAMs extend autonomy into the physical world, enabling trustless systems for Real and Digital World Assets (RDWAs). In this paper, we explore the technological foundations, and challenges of DAMs and argue that DAMs are pivotal in transitioning from trust-based to trustless economic models, offering scalable, transparent, and equitable solutions for asset management. The integration of AI-driven decision-making, IoT-enabled operational autonomy, and blockchain-based governance allows DAMs to decentralize ownership, optimize resource allocation, and democratize access to economic opportunities. Therefore, in this research, we highlight the potential of DAMs to address inefficiencies in centralized systems, reduce wealth disparities, and foster a post-labor economy.",
+    "published": "2025-04-22",
+    "venue": "IEEE International Conference on Blockchain and Cryptocurrency (ICBC)",
+    "work_type": "preprint",
+    "doi": "10.1109/icbc64466.2025.11185065",
+    "arxiv_id": "2504.15676",
+    "openalex_id": "W4414632071",
+    "url": "https://arxiv.org/abs/2504.15676",
+    "paper_id": "PAPER-001",
+    "status": "included",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "source_id": "2504.15676",
+        "search_id": "SEARCH-001",
+        "query": "decentralized autonomous machines",
+        "retrieved_at": "2026-11-26T16:31:38Z"
+      },
+      {
+        "source": "openalex",
+        "source_id": "W4414632071",
+        "search_id": "SEARCH-001",
+        "query": "decentralized autonomous machines",
+        "retrieved_at": "2026-11-26T16:31:38Z"
+      },
+      {
+        "source": "arxiv",
+        "source_id": "2504.15676",
+        "search_id": "SEARCH-002",
+        "query": "decentralized autonomous machines",
+        "retrieved_at": "2026-11-26T16:31:38Z"
+      },
+      {
+        "source": "openalex",
+        "source_id": "W4414632071",
+        "search_id": "SEARCH-002",
+        "query": "decentralized autonomous machines",
+        "retrieved_at": "2026-11-26T16:31:38Z"
+      }
+    ]
+  },
+  {
+    "title": "Delegation and Participation in Decentralized Governance: An Epistemic View",
+    "authors": [
+      "Jeff Strnad"
+    ],
+    "abstract": "We develop and apply epistemic tests to various decentralized governance methods as well as to study the impact of participation. These tests probe the ability to reach a correct outcome when there is one. We find that partial abstention is a strong governance method from an epistemic standpoint compared to alternatives such as various forms of ``transfer delegation\" in which voters explicitly transfer some or all of their voting rights to others. We make a stronger case for multi-step transfer delegation than is present in previous work but also demonstrate that transfer delegation has inherent epistemic weaknesses. We show that enhanced direct participation, voters exercising their own voting rights, can have a variety of epistemic impacts, some very negative. We identify governance conditions under which additional direct participation is guaranteed to do no epistemic harm and is likely to increase the probability of making correct decisions. In light of the epistemic challenges of voting-based decentralized governance, we consider the possible supplementary use of prediction markets, auctions, and AI agents to improve outcomes. All these results are significant because epistemic performance matters if entities such as DAOs (decentralized autonomous organizations) wish to compete with organizations that are more centralized.",
+    "published": "2025-05-07",
+    "venue": null,
+    "work_type": "preprint",
+    "doi": null,
+    "arxiv_id": "2505.04136",
+    "openalex_id": null,
+    "url": "https://arxiv.org/abs/2505.04136",
+    "paper_id": "PAPER-002",
+    "status": "excluded",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "source_id": "2505.04136",
+        "search_id": "SEARCH-001",
+        "query": "decentralized autonomous machines",
+        "retrieved_at": "2026-11-26T16:31:38Z"
+      },
+      {
+        "source": "arxiv",
+        "source_id": "2505.04136",
+        "search_id": "SEARCH-002",
+        "query": "decentralized autonomous machines",
+        "retrieved_at": "2026-11-26T16:31:38Z"
+      }
+    ]
+  },
+  {
+    "title": "\"Agentic Decentralized Autonomous Machines Dataset\"",
+    "authors": [
+      "Chiebonam Benjamin Nweke"
+    ],
+    "abstract": null,
+    "published": "2026-02-09",
+    "venue": "IEEE DataPort",
+    "work_type": "dataset",
+    "doi": "10.21227/hyqx-bn32",
+    "arxiv_id": null,
+    "openalex_id": "W7128368514",
+    "url": "https://doi.org/10.21227/hyqx-bn32",
+    "paper_id": "PAPER-003",
+    "status": "excluded",
+    "provenance": [
+      {
+        "source": "openalex",
+        "source_id": "W7128368514",
+        "search_id": "SEARCH-001",
+        "query": "decentralized autonomous machines",
+        "retrieved_at": "2026-11-26T16:31:38Z"
+      },
+      {
+        "source": "openalex",
+        "source_id": "W7128368514",
+        "search_id": "SEARCH-002",
+        "query": "decentralized autonomous machines",
+        "retrieved_at": "2026-11-26T16:31:38Z"
+      }
+    ]
+  },
+  {
+    "title": "Decentralized Machine Learning for Autonomous Vehicle Control",
+    "authors": [
+      "Jincheng Zhang"
+    ],
+    "abstract": null,
+    "published": "2026-09-05",
+    "venue": "Zenodo (CERN European Organization for Nuclear Research)",
+    "work_type": "preprint",
+    "doi": "10.5281/zenodo.22316806",
+    "arxiv_id": null,
+    "openalex_id": "W7208821528",
+    "url": "https://doi.org/10.5281/zenodo.22316806",
+    "paper_id": "PAPER-004",
+    "status": "excluded",
+    "provenance": [
+      {
+        "source": "openalex",
+        "source_id": "W7208821528",
+        "search_id": "SEARCH-001",
+        "query": "decentralized autonomous machines",
+        "retrieved_at": "2026-11-26T16:31:38Z"
+      },
+      {
+        "source": "openalex",
+        "source_id": "W7208821528",
+        "search_id": "SEARCH-002",
+        "query": "decentralized autonomous machines",
+        "retrieved_at": "2026-11-26T16:31:38Z"
+      }
+    ]
+  }
+]

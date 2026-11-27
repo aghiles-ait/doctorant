@@ -92,7 +92,7 @@ def test_interrupted_write_is_rolled_back(design, settings, monkeypatch):
         repositories, "_insert_state_change", lambda *a: (_ for _ in ()).throw(KeyboardInterrupt)
     )
     with pytest.raises(KeyboardInterrupt):
-        design.transition(S.PROBLEM_FORMULATION, actor="agent", policy=settings.policy, force=True)
+        design.transition(S.SCIENTIFIC_REVIEW, actor="agent", policy=settings.policy, force=True)
     assert reopen(design).load_project() == before
 
 
@@ -108,5 +108,5 @@ def test_interrupted_gate_decision_is_rolled_back(submitted, monkeypatch, human)
 
 
 def test_forced_transition_is_reported(design, settings):
-    design.transition(S.PROBLEM_FORMULATION, actor="agent", policy=settings.policy, force=True)
+    design.transition(S.SCIENTIFIC_REVIEW, actor="agent", policy=settings.policy, force=True)
     assert resume_report(reopen(design), settings).last_change_forced

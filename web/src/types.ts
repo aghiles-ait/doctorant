@@ -114,5 +114,6 @@ export interface Config {
     transcripts_dir: string; research_agents: string[];
     prices: Record<string, { input: number; output: number; cache_write_5m: number; cache_write_1h: number; cache_read: number }>;
   };
-  config_hash: string; values_hash: string; files: Record<string, string>;
+  config_hash: string; values_hash: string; files: Record<string, string>; data: Record<string, Record<string, unknown>>;
+  informative: Record<string, Record<string, string>>;
 }

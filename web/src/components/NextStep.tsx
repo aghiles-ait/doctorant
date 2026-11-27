@@ -1,7 +1,8 @@
 import type { ProjectView } from "../types";
 import { label } from "../workflow";
+import { RepairButton, Transitions } from "./actions";
 
-export function NextStep({ project }: { project: ProjectView }) {
+export function NextStep({ project, onChanged }: { project: ProjectView; onChanged: () => void }) {
   const r = project.resume;
   const blockers = Object.entries(r.next_steps);
   return (
@@ -16,8 +17,11 @@ export function NextStep({ project }: { project: ProjectView }) {
           ))}
         </ul>
       )}
-      {r.stale_exports.length > 0 &&
-        <p className="sub">⚠ Exports périmés : {r.stale_exports.join(", ")} (project resume --repair)</p>}
+      {r.stale_exports.length > 0 && (
+        <p className="sub">⚠ Exports périmés : {r.stale_exports.join(", ")}{" "}
+          <RepairButton project={project} onChanged={onChanged} /></p>
+      )}
+      <Transitions project={project} onChanged={onChanged} />
     </div>
   );
 }

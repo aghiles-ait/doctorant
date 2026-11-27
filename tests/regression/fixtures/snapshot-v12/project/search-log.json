@@ -1,0 +1,98 @@
+[
+  {
+    "search_id": "SEARCH-001",
+    "project_id": "decentralized-ai-governance",
+    "gap_id": null,
+    "query": {
+      "text": "decentralized autonomous machines",
+      "date_from": "2024-01-01",
+      "date_to": "2026-10-26",
+      "max_results": 3
+    },
+    "sources": [
+      "arxiv",
+      "openalex"
+    ],
+    "started_at": "2026-11-26T16:31:38Z",
+    "finished_at": "2026-11-26T16:31:38Z",
+    "status": "completed",
+    "results": [
+      {
+        "source": "arxiv",
+        "status": "ok",
+        "provider_query": "(all:decentralized AND all:autonomous AND all:machines) AND (cat:cs.AI OR cat:cs.MA OR cat:cs.CR OR cat:cs.CY OR cat:cs.DC OR cat:cs.GT OR cat:cs.LG OR cat:cs.NI OR cat:cs.CL) AND submittedDate:[202401010000 TO 202610262359]",
+        "total_available": 199,
+        "hits": 2,
+        "warnings": [],
+        "error": null
+      },
+      {
+        "source": "openalex",
+        "status": "ok",
+        "provider_query": "title_and_abstract.search:decentralized autonomous machines,primary_topic.field.id:17,has_abstract:true,type:article|preprint|conference-paper|review|book-chapter,from_publication_date:2024-01-01,to_publication_date:2026-10-26",
+        "total_available": 871,
+        "hits": 3,
+        "warnings": [],
+        "error": null
+      }
+    ],
+    "new_paper_ids": [
+      "PAPER-001",
+      "PAPER-002",
+      "PAPER-003",
+      "PAPER-004"
+    ],
+    "matched_paper_ids": [],
+    "merge_warnings": [],
+    "tool_version": "0.1.0",
+    "config_hash": "sha256:737be7f7e1a4218bfebde4ea4105d2299a398ffa2e9688ed5cee87d2cf3e5600"
+  },
+  {
+    "search_id": "SEARCH-002",
+    "project_id": "decentralized-ai-governance",
+    "gap_id": "GAP-001",
+    "query": {
+      "text": "decentralized autonomous machines",
+      "date_from": "2024-01-01",
+      "date_to": "2026-10-26",
+      "max_results": 3
+    },
+    "sources": [
+      "arxiv",
+      "openalex"
+    ],
+    "started_at": "2026-11-26T16:31:38Z",
+    "finished_at": "2026-11-26T16:31:38Z",
+    "status": "completed",
+    "results": [
+      {
+        "source": "arxiv",
+        "status": "ok",
+        "provider_query": "(all:decentralized AND all:autonomous AND all:machines) AND (cat:cs.AI OR cat:cs.MA OR cat:cs.CR OR cat:cs.CY OR cat:cs.DC OR cat:cs.GT OR cat:cs.LG OR cat:cs.NI OR cat:cs.CL) AND submittedDate:[202401010000 TO 202610262359]",
+        "total_available": 199,
+        "hits": 2,
+        "warnings": [],
+        "error": null
+      },
+      {
+        "source": "openalex",
+        "status": "ok",
+        "provider_query": "title_and_abstract.search:decentralized autonomous machines,primary_topic.field.id:17,has_abstract:true,type:article|preprint|conference-paper|review|book-chapter,from_publication_date:2024-01-01,to_publication_date:2026-10-26",
+        "total_available": 871,
+        "hits": 3,
+        "warnings": [],
+        "error": null
+      }
+    ],
+    "new_paper_ids": [],
+    "matched_paper_ids": [
+      "PAPER-001",
+      "PAPER-002",
+      "PAPER-003",
+      "PAPER-004"
+    ],
+    "merge_warnings": [],
+    "tool_version": "0.1.0",
+    "config_hash": "sha256:5a3886b4e5ccceddb9700995082a6211a07bf7dcc11a10668b9a884c1d504085"
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "session_id": "EVAL-001",
+    "project_id": "decentralized-ai-governance",
+    "rater": "aghilesaitmessaoud",
+    "at": "2026-11-26T16:31:39Z",
+    "state": "COMPLETED",
+    "ratings": [
+      {
+        "target": "GAP-001",
+        "target_version": 1,
+        "scores": {
+          "reality": 4,
+          "evidence": 3,
+          "importance": 5
+        },
+        "comment": "Manque réel"
+      },
+      {
+        "target": "RQ-001/H1",
+        "target_version": 2,
+        "scores": {
+          "falsifiability": 4,
+          "relevance": 4,
+          "testability": 3
+        },
+        "comment": ""
+      }
+    ],
+    "comment": "RAS"
+  }
+]

@@ -1,15 +1,20 @@
 import type { ReactNode } from "react";
 import type { GateRound, ProjectView, State, Workflow } from "../types";
 import { STATES, fmtDate } from "../workflow";
+import { FulltextButton, ScopeUpload, SearchForm } from "./actions";
 import { CorpusTable, SearchTable } from "./tables";
 import { Badge, Empty, Figures, verdictTone } from "./ui";
 
-interface Props { project: ProjectView; workflow: Workflow; state: State; onOpenDocument: (name: string) => void }
+interface Props {
+  project: ProjectView; workflow: Workflow; state: State; onOpenDocument: (name: string) => void; onChanged: () => void;
+}
 
-export function StateDetail({ project, workflow, state, onOpenDocument }: Props) {
+export function StateDetail({ project, workflow, state, onOpenDocument, onChanged }: Props) {
   const visits = project.visits[state] ?? 0;
+  const order = workflow.states;
   const status = state === project.state ? <Badge tone="cur">état actuel</Badge>
-    : visits ? <Badge tone="ok">{visits > 1 ? `visité ${visits} fois` : "franchi"}</Badge> : <Badge>à venir</Badge>;
+    : order.indexOf(state) < order.indexOf(project.state)
+      ? <Badge tone="ok">{visits > 1 ? `franchi ${visits} fois` : "franchi"}</Badge> : <Badge>à venir</Badge>;
   const doc = (name: string) => project.documents.includes(name)
     ? <button className="file" onClick={() => onOpenDocument(name)}>📄 lire {name}</button> : null;
   return (
@@ -24,10 +29,19 @@ export function StateDetail({ project, workflow, state, onOpenDocument }: Props)
             : <span key={name} className="file missing">— {name}</span>;
         })}
       </div>
+      {state === project.state && ACTIONS[state]?.(project, onChanged)}
       {DETAILS[state](project, doc)}
     </div>
   );
 }
+
+// Opérations déterministes possibles depuis l'interface, quand l'état affiché est l'état actuel du projet.
+const ACTIONS: Partial<Record<State, (p: ProjectView, onChanged: () => void) => ReactNode>> = {
+  SCOPING: (p, onChanged) => <ScopeUpload project={p} onChanged={onChanged} />,
+  LITERATURE_SEARCH: (p, onChanged) => <SearchForm project={p} onChanged={onChanged} />,
+  LITERATURE_REVIEW: (p, onChanged) => <FulltextButton project={p} onChanged={onChanged} />,
+  GAP_ANALYSIS: (p, onChanged) => <SearchForm project={p} onChanged={onChanged} forGap />,
+};
 
 type Detail = (p: ProjectView, doc: (name: string) => ReactNode) => ReactNode;
 

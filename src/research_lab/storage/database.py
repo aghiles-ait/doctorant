@@ -447,6 +447,56 @@ _MIGRATIONS: list[str] = [
     CREATE TRIGGER llm_usage_no_delete BEFORE DELETE ON llm_usage
     BEGIN SELECT RAISE(ABORT, 'la consommation enregistrée est en ajout seul'); END;
     """,
+    # 12 — suppression d'un projet (`project delete`) ou de ce qui suit l'état cible d'un retour en arrière forcé,
+    # sans trace ; les identifiants ne sont jamais réattribués
+    """
+    -- Présent seulement pendant une transaction de suppression : il lève l'interdiction de supprimer.
+    CREATE TABLE project_deletions (project_id TEXT PRIMARY KEY);
+
+    -- Plus grand numéro attribué par préfixe (PAPER, SEARCH, EV…), relevé avant chaque suppression.
+    CREATE TABLE id_counters (
+        prefix TEXT PRIMARY KEY,
+        last   INTEGER NOT NULL CHECK (last >= 0)
+    );
+    CREATE TRIGGER id_counters_no_decrease BEFORE UPDATE ON id_counters WHEN NEW.last < OLD.last
+    BEGIN SELECT RAISE(ABORT, 'un compteur d''identifiants ne diminue jamais'); END;
+    """
+    + "".join(
+        f"""
+    DROP TRIGGER {trigger};
+    CREATE TRIGGER {trigger} BEFORE DELETE ON {table} WHEN NOT EXISTS (SELECT 1 FROM project_deletions)
+    BEGIN SELECT RAISE(ABORT, '{message}'); END;
+    """
+        for trigger, table, message in [
+            ("papers_no_delete", "papers", "une publication ne peut pas être supprimée"),
+            ("searches_no_delete", "searches", "le journal des recherches est en ajout seul"),
+            ("state_changes_no_delete", "state_changes", "l''historique des états est en ajout seul"),
+            ("screening_no_delete", "screening_decisions", "l''historique du tri est en ajout seul"),
+            ("fulltexts_no_delete", "fulltexts", "un texte intégral ne peut pas être supprimé"),
+            ("evidence_no_delete", "evidence", "une preuve ne peut pas être supprimée ; la retirer"),
+            ("gaps_no_delete", "gaps", "un gap ne peut pas être supprimé ; le retirer (statut withdrawn)"),
+            ("gap_versions_no_delete", "gap_versions", "l''historique des gaps est en ajout seul"),
+            ("gap_evidence_no_delete", "gap_evidence", "l''historique des gaps est en ajout seul"),
+            ("alignments_no_delete", "alignments", "l''historique des évaluations est en ajout seul"),
+            ("gate_submissions_no_delete", "gate_submissions", "une soumission de gate est immuable"),
+            ("gate_decisions_no_delete", "gate_decisions", "une décision de gate est immuable"),
+            ("research_questions_no_delete", "research_questions",
+             "une question ne peut pas être supprimée ; la retirer (statut withdrawn)"),
+            ("question_versions_no_delete", "question_versions", "l''historique des questions est en ajout seul"),
+            ("question_gaps_no_delete", "question_gaps", "l''historique des questions est en ajout seul"),
+            ("question_evidence_no_delete", "question_evidence", "l''historique des questions est en ajout seul"),
+            ("solutions_no_delete", "solutions",
+             "une solution ne peut pas être supprimée ; la retirer (statut withdrawn)"),
+            ("solution_versions_no_delete", "solution_versions", "l''historique des solutions est en ajout seul"),
+            ("solution_evidence_no_delete", "solution_evidence", "l''historique des solutions est en ajout seul"),
+            ("solution_comparisons_no_delete", "solution_comparisons",
+             "l''historique des comparaisons est en ajout seul"),
+            ("scientific_reviews_no_delete", "scientific_reviews", "une revue est immuable"),
+            ("objections_no_delete", "objections", "une objection est immuable"),
+            ("objection_responses_no_delete", "objection_responses", "l''historique des réponses est en ajout seul"),
+            ("rating_sessions_no_delete", "rating_sessions", "une évaluation humaine est immuable"),
+        ]
+    ),
 ]
 
 SCHEMA_VERSION = len(_MIGRATIONS)

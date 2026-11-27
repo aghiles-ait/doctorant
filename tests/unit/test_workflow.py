@@ -66,12 +66,19 @@ def test_forced_transition_skips_preconditions_and_is_traced(repo):
     with pytest.raises(TransitionError, match="scope.md"):
         repo.transition(ResearchState.LITERATURE_SEARCH, actor="alice", policy=POLICY)
     repo.transition(ResearchState.SOLUTION_DESIGN, actor="alice", policy=POLICY, force=True)
-    repo.transition(ResearchState.SCOPING, actor="alice", policy=POLICY, force=True)  # retour en arrière
-    history = repo.load_project().history
-    assert [(c.to_state, c.forced) for c in history[-3:]] == [
-        (ResearchState.SCOPING, False), (ResearchState.SOLUTION_DESIGN, True), (ResearchState.SCOPING, True),
+    assert [(c.to_state, c.forced) for c in repo.load_project().history[-2:]] == [
+        (ResearchState.SCOPING, False), (ResearchState.SOLUTION_DESIGN, True),
     ]
     assert "forced: true" in repo.project_file.read_text()
+    # Retour en arrière forcé : l'historique est rembobiné, comme si l'état n'avait jamais été atteint.
+    repo.transition(ResearchState.SCOPING, actor="alice", policy=POLICY, force=True)
+    assert [c.to_state for c in repo.load_project().history] == [ResearchState.NEW, ResearchState.SCOPING]
+    # Vers un état jamais atteint (sauté par une transition forcée), le retour reste tracé.
+    repo.transition(ResearchState.SOLUTION_DESIGN, actor="alice", policy=POLICY, force=True)
+    repo.transition(ResearchState.LITERATURE_REVIEW, actor="alice", policy=POLICY, force=True)
+    assert [(c.from_state, c.to_state, c.forced) for c in repo.load_project().history[-1:]] == [
+        (ResearchState.SCOPING, ResearchState.LITERATURE_REVIEW, True),
+    ]
 
 
 @pytest.mark.parametrize("target", [ResearchState.AWAITING_GATE_1, ResearchState.AWAITING_GATE_2, ResearchState.COMPLETED])

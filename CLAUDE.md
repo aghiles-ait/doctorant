@@ -37,7 +37,7 @@ Python ≥ 3.12, environnement dans `.venv/` (voir README.md pour l'installation
   `workflow/` (états, transitions et leurs préconditions sur `ProjectFacts` ; `approvals.py` :
   soumission et décision des gates), `corpus.py`,
   `watch.py` (recherche), `fulltext.py` (PDF en accès libre), `review.py` (tri, preuves),
-  `gaps.py` (gaps, alignement), `resume.py` (reprise : `project resume`), `scope.py` (sections numérotées de `scope.md`, raison de tri « §N — justification »), `evaluation.py` (indicateurs `eval report`, notation humaine `eval rate`), `costs.py` (coûts lus dans les transcriptions de Claude Code, `costs report` ; prix dans `config/costs.yaml`), `views.py` et `api.py` (API FastAPI en lecture seule pour l'interface web, `research-lab serve`), `questions.py` (questions et hypothèses), `solutions.py` (solutions et comparaisons), `critique.py` (revue critique, réponses), `proposal.py` et `bibliography.py` (Proposal,
+  `gaps.py` (gaps, alignement), `resume.py` (reprise : `project resume`), `scope.py` (sections numérotées de `scope.md`, raison de tri « §N — justification »), `evaluation.py` (indicateurs `eval report`, notation humaine `eval rate`), `costs.py` (coûts lus dans les transcriptions de Claude Code, `costs report` ; prix dans `config/costs.yaml`), `views.py` et `api.py` (API FastAPI de l'interface web, `research-lab serve`), `backup.py` (`db backup`), `questions.py` (questions et hypothèses), `solutions.py` (solutions et comparaisons), `critique.py` (revue critique, réponses), `proposal.py` et `bibliography.py` (Proposal,
   `references.bib`), `cli.py`. `templates/research-proposal.md` : sections contrôlées par `proposal check`.
 - `validation/gaps.py` : règles déterministes des gaps (force des preuves, statut `supported`,
   nouveauté) et de l'évaluation au regard des valeurs, calcul des scores de priorité.
@@ -54,7 +54,9 @@ Python ≥ 3.12, environnement dans `.venv/` (voir README.md pour l'installation
 - `knowledge/papers/` : PDF et texte extrait page par page (`PAPER-xxx.pages.json`), partagés
   entre projets, non versionnés ; l'empreinte du texte est contrôlée à chaque lecture.
 - `knowledge/research.db` : **source de vérité**, partagée entre projets. Les identifiants
-  `PAPER-xxx` et `SEARCH-xxx` sont globaux. Toute évolution du schéma passe par une nouvelle
+  `PAPER-xxx` et `SEARCH-xxx` sont globaux. Seule `project delete` (humain, ou bouton de l'interface)
+  supprime des données : le projet entier et les publications qu'aucun autre projet n'utilise, sans trace ;
+  `id_counters` (migration 12) empêche de réattribuer un identifiant. Toute évolution du schéma passe par une nouvelle
   migration ajoutée à la fin de `_MIGRATIONS` ; ne jamais modifier une migration existante.
 - `research/projects/<id>/` : un dossier par projet. `scope.md`, `literature-review.md` et
   `research-proposal.md` sont rédigés par l'agent ; `references.bib` est généré par `proposal references` ;
@@ -63,8 +65,10 @@ Python ≥ 3.12, environnement dans `.venv/` (voir README.md pour l'installation
   après chaque écriture. `drafts/` contient les brouillons JSON écrits par l'agent pour
   `gap add/revise`, `alignment set`, `question add/revise` et `solution add/revise/compare`.
 - `web/` : interface React (Vite, TypeScript), compilée dans `web/dist` (non versionné) et servie par
-  `research-lab serve` ; `npm run dev` pour la développer (API sur le port 8765). Elle ne fait que lire :
-  aucune décision humaine ni écriture dans la base ne passe par l'interface.
+  `research-lab serve` ; `npm run dev` pour la développer (API sur le port 8765). Elle n'écrit que par des opérations déterministes de
+  la CLI, avec les mêmes contrôles (création et suppression de projet, dépôt de `scope.md`, valeurs de
+  `config/` via `config_edit.py` — validées, commentaires conservés —, transition éventuellement forcée, recherche, texte intégral,
+  régénération des exports, coûts, sauvegarde) ; aucune décision humaine (gates, `eval rate`) ne passe par l'interface.
 - `tests/unit`, `tests/integration` ; `tests/fixtures` contient des réponses réelles des APIs.
   `tests/regression` : références `golden/` du scénario complet et instantanés `fixtures/snapshot-vN/`
   d'anciennes versions. Ne jamais modifier un instantané ; après un changement voulu des exports,
@@ -82,7 +86,8 @@ Python ≥ 3.12, environnement dans `.venv/` (voir README.md pour l'installation
   Un gap, une question ou une solution se révise par une nouvelle version (`… revise`) ;
   les versions précédentes sont conservées.
 - Les transitions du workflow sont contrôlées par `workflow/transitions.py` (`--force` saute les
-  préconditions, sauf vers ou depuis les gates, et reste tracé dans l'historique) ; les validations
+  préconditions, sauf vers ou depuis les gates ; en avant, il reste tracé dans l'historique ; en arrière, il
+  efface tout ce qu'ont produit les états suivants, historique compris, et reste réservé à un humain) ; les validations
   humaines (Gate 1, Gate 2) ne doivent jamais pouvoir être effectuées par un agent : ne jamais
   lancer `gate approve` / `gate revise`, ni appeler `decide_gate_1` / `decide_gate_2`, ni contourner
   le contrôle `human_check_failure` (variable `CLAUDECODE`, terminal interactif). Les tests le simulent
